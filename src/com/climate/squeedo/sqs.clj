@@ -14,9 +14,7 @@
   (:require
     [cemerick.bandalore :as sqs]
     [cheshire.core :as json]
-    [clojure.tools.logging :as log])
-  (:import
-    [com.amazonaws.services.sqs.model ListQueuesRequest]))
+    [clojure.tools.logging :as log]))
 
 (def ^:dynamic auto-retry-seconds
   "How long to wait before retrying a non-responding compute request."

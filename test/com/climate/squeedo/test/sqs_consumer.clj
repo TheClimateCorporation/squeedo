@@ -12,19 +12,15 @@
 ;; and limitations under the License.
 (ns com.climate.squeedo.test.sqs-consumer
   (:require
-    [cemerick.bandalore :as bandalore]
     [clojure.core.async :refer [<!! >!! <! timeout close! buffer chan go >!]]
     [clojure.test :refer :all]
     [clojure.core.async :refer [<!! >!! <! put! timeout close! buffer chan go >!]]
     [org.httpkit.client]
-    [clojure.tools.logging :as log]
     [com.climate.squeedo.sqs :as sqs]
     [com.climate.squeedo.test.sqs :as sqs-test]
-    [cemerick.bandalore :as sqs-client]
     [com.climate.squeedo.sqs-consumer :as sqs-server]
     [com.climate.claypoole :as cp])
   (:import
-    [java.util.concurrent TimeUnit]
     [java.util.concurrent TimeoutException]))
 
 (defonce tracker (atom 0))

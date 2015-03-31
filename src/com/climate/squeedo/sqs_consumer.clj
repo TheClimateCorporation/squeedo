@@ -14,9 +14,8 @@
   "Functions for using Amazon Simple Queueing Service to request and perform
  computation."
   (:require
-    [clojure.core.async :as a :refer [close! go-loop go >! <! <!! >!! chan buffer onto-chan]]
+    [clojure.core.async :refer [close! go-loop go >! <! <!! >!! chan buffer onto-chan]]
     [com.climate.squeedo.sqs :as gsqs]
-    [cemerick.bandalore :as sqs]
     [clojure.tools.logging :as log]))
 
 (defn- create-queue-listener
