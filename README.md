@@ -108,7 +108,7 @@ Checkout the `com.climate.squeedo.sqs` namespace for extra goodies like connecti
 
 ## Acknowledgments
 
-Shoutouts to [Jeff Melching](https://github.com/jmelching), Tim Chagnon, and Robert Grailer for being major contributors to this project. 
+Shoutouts to [Jeff Melching](https://github.com/jmelching), Tim Chagnon, and [Robert Grailer](https://github.com/RobertGrailer) for being major contributors to this project. 
 
 ## License
 

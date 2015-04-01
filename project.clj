@@ -28,7 +28,7 @@
   :profiles {:dev {:dependencies
                    [[lein-marginalia "0.7.1"]
                     [http-kit "2.1.16"]
-                    [com.climate/claypoole "0.3.1"]]}}
+                    [com.climate/claypoole "0.4.0"]]}}
   :plugins [[lein-marginalia "0.7.1"]]
 
   :test-selectors {:default #(not-any? % #{:integration :benchmark :manual})
