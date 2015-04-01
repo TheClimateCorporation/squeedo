@@ -1,4 +1,4 @@
-# squeedo
+# Squeedo
 
 Squeedo: The sexiest message consumer ever (™)
 
@@ -8,17 +8,26 @@ so it's up to the caller to determine the proper reader for their purposes.
 
 ## Inspiration
 
-Squeedo's inspiration came from our continual need for to quickly process lots of messages from SQS. We found that the code to support these processes was quite similar in that it often involved a lot of plumbing of listening to sqs, pulling messages,  processing them with some kind of threadpool and then acking them back.  The goal was to make this easier by somehow simply passing a compute function that would do handle all of the plumbing and allow us to focus on the compute logic of what to do with the message.
+Squeedo's inspiration came from our continual need for to quickly process lots of messages from SQS. We found that the
+code to support these processes was quite similar in that it often involved a lot of plumbing of listening to SQS,
+pulling messages,  processing them with some kind of threadpool and then acking them back.  The goal was to make this
+easier by somehow simply passing a compute function that would do handle all of the plumbing and allow us to focus on
+the compute logic of what to do with the message.
 
-After several iterations of basing this plumbing code on threadpools, we quickly found that we couldn't get the kind of throughput we wanted simply by tuning only the number of threads.  We needed something more dynamic, that would adapt better to the number of cores it ran on and would squeeze every last of CPU from our EC2 instances. After reading this blog post http://martintrojer.github.io/clojure/2013/07/07/coreasync-and-blocking-io/ we were inspired to use core.async and squeedo was born.
+After several iterations of basing this plumbing code on threadpools, we quickly found that we couldn't get the kind of
+throughput we wanted simply by tuning only the number of threads.  We needed something more dynamic, that would adapt
+better to the number of cores it ran on and would squeeze every last of CPU from our EC2 instances. After reading this
+blog post http://martintrojer.github.io/clojure/2013/07/07/coreasync-and-blocking-io/ we were inspired to use
+core.async and Squeedo was born.
 
-## Why use squeedo?
+## Why use Squeedo?
 
-Where squeedo shines is in its ability to push cpu utilization to the max without managing a threadpool.  It is especially good when combined with an non-blocking I/O web client library like http-kit as mentioned in the blog above. 
+Where Squeedo shines is in its ability to push CPU utilization to the max without managing a threadpool.  It is
+especially good when combined with an non-blocking I/O web client library like http-kit as mentioned in the blog above.
 
 ## Simple quick start
 
-In its simplest form, squeedo is composed of only 2 parts, a compute function and a consumer.
+In its simplest form, Squeedo is composed of only 2 parts, a compute function and a consumer.
 
 ```clojure
 (require '[com.climate.squeedo.sqs-consumer :refer [start-consumer stop-consumer]]
@@ -36,7 +45,8 @@ In its simplest form, squeedo is composed of only 2 parts, a compute function an
 (stop-consumer consumer)  
 ```
 
-The compute function must ack/nack each message so squeedo knows when you are done working so it can pass your compute function another message to process.
+The compute function must ack/nack each message so Squeedo knows when you are done working so it can pass your compute
+function another message to process.
 
 ## http-kit example with non-blocking IO
 
@@ -67,7 +77,15 @@ The compute function must ack/nack each message so squeedo knows when you are do
   
 ```
 
-## Usage in jetty based ring app
+## Usage in Jetty based Ring app
+
+Typical project.clj configuration to setup the servlet context listener hooks:
+
+``` clojure
+  :ring
+    {:init initialize!
+     :destroy destroy!}
+```
 
 ``` clojure
 (defonce consumer (atom {}))
@@ -85,7 +103,7 @@ The compute function must ack/nack each message so squeedo knows when you are do
          (start-consumer queue-name compute-fn :max-concurrent-work 10)))
 
 (defn destroy!
-  "Destroy the jetty context and stop the SQS consumer"
+  "Destroy the Jetty context and stop the SQS consumer"
   []
   (stop-consumer @consumer)
   (reset! consumer {}))
@@ -93,22 +111,35 @@ The compute function must ack/nack each message so squeedo knows when you are do
 
 ## Advanced configurations options
 
-What of the great things about squeedo is the advanced configuration options that can be used to tune the consumer to your workflow beyond what the very reasonable defaults do out of the box.
+What of the great things about Squeedo is the advanced configuration options that can be used to tune the consumer to
+your workflow beyond what the very reasonable defaults do out of the box.
 
-* :message-channel-size - the number of messages to prefetch from sqs; default 20 * num-listeners. Prefetching messages allow us to keep the compute function continously busy without having to wait for more to be first pulled from the remote SQS queue. Make sure to set the timeout appropriately when you create the queue.
-* :num-workers - the number of workers processing messages concurrently.  This controls how many workers actually process messages at any one time. (defaults to number of CPU's - 1 or 1 if single core). Squeedo works best with 2 or more cpu's so don't change this unless you feel adventurous.  This is not the amount of work that can be outstanding at any one time, that is controlled below with :max-concurrent-work.
-* :num-listeners - the number of listeners polling from sqs. default is (num-workers / 10) since each listener dequeues up to 10 messages at a time.  If you have a really fast process, you can actually starve the compute function of messages and thus need more listeners pulling from sqs.
+* :message-channel-size - the number of messages to prefetch from SQS; default 20 * num-listeners. Prefetching messages
+allow us to keep the compute function continuously busy without having to wait for more to be first pulled from the
+remote SQS queue. Make sure to set the timeout appropriately when you create the queue.
+* :num-workers - the number of workers processing messages concurrently.  This controls how many workers actually
+process messages at any one time. (defaults to number of CPU's - 1 or 1 if single core). Squeedo works best with 2 or
+more CPU's so don't change this unless you feel adventurous.  This is not the amount of work that can be outstanding at
+any one time, that is controlled below with :max-concurrent-work.
+* :num-listeners - the number of listeners polling from SQS. default is (num-workers / 10) since each listener dequeues
+up to 10 messages at a time.  If you have a really fast process, you can actually starve the compute function of
+messages and thus need more listeners pulling from SQS.
 * :dequeue-limit - the number of messages to dequeue at a time; default 10
-* :max-concurrent-work - the maximum number of total messages processed.  This is mainly for asynch workflows where you can have work started and waiting for parked IO threads to complete; default num-workers.  This allows you to always keep the cpu's busy by having data returned by IO ready to be processed.  Its really a memory game at this point.  
-* :dl-queue-name - the dead letter queue to which messages that are failed the maximum number of times will go (will be created if necessary). Defaults to (str queue-name \"-failed\")
+* :max-concurrent-work - the maximum number of total messages processed.  This is mainly for async workflows where you
+can have work started and waiting for parked IO threads to complete; default num-workers.  This allows you to always
+keep the CPU's busy by having data returned by IO ready to be processed.  Its really a memory game at this point.
+* :dl-queue-name - the dead letter queue to which messages that are failed the maximum number of times will go (will be
+created if necessary). Defaults to (str queue-name \"-failed\")
 
 ## Additional goodies
 
-Checkout the `com.climate.squeedo.sqs` namespace for extra goodies like connecting to queues, enqueuing and dequeing messages, and ack'ing and nacking.  Mostly addon's to https://github.com/cemerick/bandalore
+Checkout the `com.climate.squeedo.sqs` namespace for extra goodies like connecting to queues, enqueuing and dequeing
+messages, and acking and nacking.  Mostly addons to https://github.com/cemerick/bandalore
 
 ## Acknowledgments
 
-Shoutouts to [Jeff Melching](https://github.com/jmelching), Tim Chagnon, and [Robert Grailer](https://github.com/RobertGrailer) for being major contributors to this project. 
+Shoutouts to [Jeff Melching](https://github.com/jmelching), [Tim Chagnon](https://github.com/tchagnon), and
+[Robert Grailer](https://github.com/RobertGrailer) for being major contributors to this project.
 
 ## License
 
