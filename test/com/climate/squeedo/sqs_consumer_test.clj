@@ -10,13 +10,13 @@
 ;; "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 ;; or implied.  See the License for the specific language governing permissions
 ;; and limitations under the License.
-(ns com.climate.squeedo.test.sqs-consumer
+(ns com.climate.squeedo.sqs-consumer-test
   (:require
     [clojure.test :refer :all]
     [clojure.core.async :refer [<!! >!! <! put! timeout close! buffer chan go >!]]
     [org.httpkit.client]
     [com.climate.squeedo.sqs :as sqs]
-    [com.climate.squeedo.test.sqs :as sqs-test]
+    [com.climate.squeedo.test-utils :refer [with-temporary-queue]]
     [com.climate.squeedo.sqs-consumer :as sqs-server]
     [com.climate.claypoole :as cp])
   (:import
@@ -165,7 +165,7 @@
 
 (deftest ^:integration test-create-queue-listener-integration
   (testing "Verify messages up to the buffer-size are retrieved"
-    (sqs-test/with-temporary-queue
+    (with-temporary-queue
       [queue-name dlq-name]
       (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
             listener (#'sqs-server/create-queue-listener connection 1 2 1)
@@ -210,7 +210,7 @@
 
 (deftest ^:integration consumer-happy-path
   (testing "Verify it consumes all messages properly"
-    (sqs-test/with-temporary-queue
+    (with-temporary-queue
       [queue-name dlq-name]
       (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
             num-messages 10
@@ -226,7 +226,7 @@
 (deftest ^:integration consumer-continues-processing
   (testing "Verify it consumes messages after queue empty"
     (binding [sqs/poll-timeout-seconds 0]
-      (sqs-test/with-temporary-queue
+      (with-temporary-queue
         [queue-name dlq-name]
         (let [num-messages 5
               connection (sqs/mk-connection queue-name :dead-letter dlq-name)
@@ -243,7 +243,7 @@
 
 (deftest ^:integration stop-consumer
   (testing "Verify stop-consumer closes channels"
-    (sqs-test/with-temporary-queue
+    (with-temporary-queue
       [queue-name dlq-name]
       ;; Work with a test queue.
       (let [consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
@@ -255,7 +255,7 @@
 
 (deftest ^:integration nacking-works
   (testing "Verify we can nack a message and retry"
-    (sqs-test/with-temporary-queue
+    (with-temporary-queue
       [queue-name dlq-name]
       (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
             _ (sqs/enqueue connection "hello")
@@ -276,7 +276,7 @@
 
 (defn- time-consumer
   [& {:keys [n num-workers num-listeners dequeue-limit] :as args}]
-  (sqs-test/with-temporary-queue
+  (with-temporary-queue
     [queue-name dlq-name]
     (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
           _ (cp/upmap 100 (partial sqs/enqueue connection) (range n))
@@ -314,7 +314,7 @@
 ;; run this to see how good squeedo works with cpu and async non-blocking IO
 ;; on my 8 core machine i can drive cpu usage to 750%
 (deftest ^:manual example-awesome-cpu-usage
-  (sqs-test/with-temporary-queue
+  (with-temporary-queue
     [queue-name dlq-name]
     (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
           intense-cpu-fn #(eat-some-cpu 1000000)

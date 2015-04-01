@@ -36,6 +36,9 @@
     [message-channel buf]))
 
 (defn- create-workers
+  "Create workers to actually run the compute function. Workers are expected to be CPU bound
+   or handle all IO in an asynchronous manner.  In the future we may add an option to run computes
+   in a thread/pool that isn't part of the core.async's threadpool."
   [connection worker-size max-concurrent-work message-channel compute]
   (let [done-channel (chan worker-size)
         ; the work-token-channel ensures we only have a fixed numbers of messages processed at one time
@@ -84,15 +87,16 @@
     compute - a compute function that takes two args: a 'message' containing the body of the sqs
               message and a channel on which to ack/nack when done.
     opts -
-           :message-channel-size : the number of messages to prefetch from sqs; default 20 * num-listeners
-           :num-workers : the number of workers processing messages concurrently
-           :num-listeners : the number of listeners polling from sqs. default is (num-workers / 10)
-                            since each listener dequeues up to 10 messages at a time
-           :dequeue-limit : the number of messages to dequeue at a time; default 10
-           :max-concurrent-work : the maximum number of total messages processed.  This is mainly for
-                            asynch workflows; default num-workers
-           :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
-                            times will go (will be created if necessary). Defaults to (str queue-name \"-failed\")
+       :message-channel-size : the number of messages to prefetch from sqs; default 20 * num-listeners
+       :num-workers : the number of workers processing messages concurrently
+       :num-listeners : the number of listeners polling from sqs. default is (num-workers / 10)
+                        since each listener dequeues up to 10 messages at a time
+       :dequeue-limit : the number of messages to dequeue at a time; default 10
+       :max-concurrent-work : the maximum number of total messages processed.  This is mainly for
+                        asynch workflows; default num-workers
+       :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
+                        times will go (will be created if necessary).
+                        Defaults to (str queue-name \"-failed\")
    outputs:
     a map with keys, :done-channel - the channel to send messages to be acked
                      :message-channel - unused by the client.
