@@ -22,16 +22,16 @@
                  [org.clojure/tools.cli "0.3.1"]
                  [org.clojure/tools.logging "0.3.0"]
                  [cheshire/cheshire "5.3.1"]
-                 [http-kit "2.1.16"]
                  [com.cemerick/bandalore "0.0.6"]
                  [org.clojure/core.async "0.1.338.0-5c5012-alpha"]]
 
   :profiles {:dev {:dependencies
                    [[lein-marginalia "0.7.1"]
+                    [http-kit "2.1.16"]
                     [com.climate/claypoole "0.3.1"]]}}
   :plugins [[lein-marginalia "0.7.1"]]
 
-  :test-selectors {:default #(not-any? % #{:integration :benchmark})
+  :test-selectors {:default #(not-any? % #{:integration :benchmark :manual})
                    :integration :integration
                    :benchmark :benchmark
                    :all (fn [_] true)})

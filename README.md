@@ -32,14 +32,40 @@ In its simplest form, squeedo is composed of only 2 parts, a compute function an
   
 (def consumer (start-consumer "my-sqs-queue" compute))
 
-;when done listening
+;;when done listening
 (stop-consumer consumer)  
 ```
 
 The compute function must ack/nack each message so squeedo knows when you are done working so it can pass your compute function another message to process.
 
-## http-kit example
-TODO
+## http-kit example with non-blocking IO
+
+``` clojure
+(require '[com.climate.squeedo.sqs-consumer :refer [start-consumer stop-consumer]]
+         '[org.httpkit.client]
+         '[clojure.core.async :refer [go >!]])
+
+(defn- eat-some-cpu [how-much]
+  (reduce + (range 1 how-much)))
+
+(defn- async-get [url message channel]
+  (org.httpkit.client/get url (fn [r] (go
+                                        ; do some more processing with the response
+                                        (eat-some-cpu 1000000)
+                                        (>! channel message)))))
+
+(defn compute [message done-channel]
+  ; do something expensive
+  (eat-some-cpu 1000000)
+  ; do this if you will have I/O
+  (async-get "http://google.com" message done-channel))
+  
+(def consumer (start-consumer "my-sqs-queue" compute :num-listeners 10 :max-concurrent-work 50))
+ 
+;;when done listening
+;; (stop-consumer consumer) 
+  
+```
 
 ## Usage in jetty based ring app
 
@@ -75,7 +101,6 @@ What of the great things about squeedo is the advanced configuration options tha
 * :dequeue-limit - the number of messages to dequeue at a time; default 10
 * :max-concurrent-work - the maximum number of total messages processed.  This is mainly for asynch workflows where you can have work started and waiting for parked IO threads to complete; default num-workers.  This allows you to always keep the cpu's busy by having data returned by IO ready to be processed.  Its really a memory game at this point.  
 * :dl-queue-name - the dead letter queue to which messages that are failed the maximum number of times will go (will be created if necessary). Defaults to (str queue-name \"-failed\")
-   
 
 ## Additional goodies
 

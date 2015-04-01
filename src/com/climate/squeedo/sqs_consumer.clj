@@ -72,7 +72,7 @@
 
    The client has responsibility for calling stop-consumer when you no longer want to process messages.
    Additionally, the client MUST send the message back on the done-channel when processing is complete
-   or an exception occurs and the message will be removed from SQS.
+   or if an uncaught exception occurs the message will be auto-nack'd in SQS.
 
    Failed messages will currently not be acked, but rather go back on for redelivery after the timeout.
 
@@ -81,8 +81,8 @@
    inputs:
     queue-name - the name of an sqs queue (will be created if necessary)
 
-    compute - a compute function that takes a single arg 'message' containing the body of the sqs
-              message.
+    compute - a compute function that takes two args: a 'message' containing the body of the sqs
+              message and a channel on which to ack/nack when done.
     opts -
            :message-channel-size : the number of messages to prefetch from sqs; default 20 * num-listeners
            :num-workers : the number of workers processing messages concurrently

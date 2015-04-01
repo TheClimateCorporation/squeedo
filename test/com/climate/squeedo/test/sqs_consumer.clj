@@ -12,7 +12,6 @@
 ;; and limitations under the License.
 (ns com.climate.squeedo.test.sqs-consumer
   (:require
-    [clojure.core.async :refer [<!! >!! <! timeout close! buffer chan go >!]]
     [clojure.test :refer :all]
     [clojure.core.async :refer [<!! >!! <! put! timeout close! buffer chan go >!]]
     [org.httpkit.client]
@@ -42,23 +41,35 @@
          (throw (TimeoutException.)))
        result#)))
 
-(defn async-get [url result message]
+(defn async-get [url message channel compute-more-fn]
   (org.httpkit.client/get url (fn [r] (go
-                                        (>! result message)
+                                        ; do some more processing with the response
+                                        (when compute-more-fn
+                                          (compute-more-fn))
+                                        (>! channel message)
                                         (swap! tracker inc)))))
+
+(defn- eat-some-cpu [how-much]
+  (reduce + (range 1 how-much)))
+
+(defn- wait-for-messages [num-messages timeout]
+  (with-timeout timeout
+                (while (not (= num-messages @tracker))
+                  (Thread/sleep 100))))
+
 ; for testing other types of computes
-(defn simple-compute [message done-channel]
+(defn- simple-compute [message done-channel]
   ;(println message)
   (put! done-channel message)
   (swap! tracker inc))
 
-(defn compute [message done-channel]
+(defn- compute [message done-channel]
   ; do something expensive
-  (reduce + (range 1 100000))
+  (eat-some-cpu 100000)
   ; do this if you will have I/O
-  (async-get "http://google.com" done-channel message))
+  (async-get "http://google.com" message done-channel nil))
 
-(defn slow-compute [message done-channel]
+(defn- slow-compute [message done-channel]
   ; don't ever do this.
   (Thread/sleep 2000)
   (put! done-channel message))
@@ -75,8 +86,8 @@
               buf (second listener)
               wait-and-check (fn [count]
                                (with-timeout 1000
-                                 (while (< (.count buf) count)
-                                   (Thread/sleep 100)))
+                                             (while (< (.count buf) count)
+                                               (Thread/sleep 100)))
                                (is (true? (.full? buf)))
                                (is (= (.count buf) count))
                                (<!! message-channel))]
@@ -90,12 +101,11 @@
 (deftest create-workers
   (testing "Verify workers ack processed messages"
     (with-redefs [sqs/ack (fn [_ _] (swap! tracker inc))]
-      (let [message-channel (chan (buffer 4))
+      (let [num-messages 4
+            message-channel (chan (buffer num-messages))
             done-channel (#'sqs-server/create-workers nil 2 2 message-channel slow-compute)]
-        (doseq [_ (range 4)] (>!! message-channel "ignored"))
-        (with-timeout 1000000
-          (while (not (= 4 @tracker))
-            (Thread/sleep 100)))
+        (doseq [_ (range num-messages)] (>!! message-channel "ignored"))
+        (wait-for-messages num-messages 60000)
         (close! message-channel)
         (close! done-channel)))))
 
@@ -110,18 +120,18 @@
       (with-redefs [sqs-server/create-queue-listener (fn [_ num-listeners message-channel-size dequeue-limit]
                                                        (is (= message-channel-size 20))
                                                        (is (= num-listeners
-                                                             (-> Runtime
-                                                               (.. getRuntime availableProcessors)
-                                                               (- 1)
-                                                               (/ 10)
-                                                               int
-                                                               (max 1))))
+                                                              (-> Runtime
+                                                                  (.. getRuntime availableProcessors)
+                                                                  (- 1)
+                                                                  (/ 10)
+                                                                  int
+                                                                  (max 1))))
                                                        (is (= dequeue-limit 10))
                                                        [1])
                     sqs-server/create-workers (fn [_ num-workers _ _ _]
                                                 (is (= num-workers
-                                                      (- (.. Runtime getRuntime availableProcessors)
-                                                        1))))]
+                                                       (- (.. Runtime getRuntime availableProcessors)
+                                                          1))))]
         (sqs-server/start-consumer "q" (fn [_ _] println) :dl-queue-name "q-dl")))
     (testing "message-channel-size can be configured"
       (with-redefs [sqs-server/create-queue-listener (fn [_ _ message-channel-size _]
@@ -164,8 +174,8 @@
             _ (doseq [i (range 4)] (sqs/enqueue connection i))
             wait-and-check (fn [count]
                              (with-timeout 10000
-                               (while (< (.count buf) count)
-                                 (Thread/sleep 100)))
+                                           (while (< (.count buf) count)
+                                             (Thread/sleep 100)))
                              (is (true? (.full? buf)))
                              (is (= (.count buf) count))
                              (<!! message-channel))]
@@ -186,14 +196,12 @@
                   sqs/mk-connection (fn [_ _ _] {})]
       (let [num-workers 4
             consumer (sqs-server/start-consumer "queue-name"
-                       (fn [_ _]
-                         ; an intentionally bad consumer,
-                         ; that forgets to ack back
-                         (swap! tracker inc))
-                       :num-workers num-workers)]
-        (with-timeout 1000
-          (while (not (= num-workers @tracker))
-            (Thread/sleep 100)))
+                                                (fn [_ _]
+                                                  ; an intentionally bad consumer,
+                                                  ; that forgets to ack back
+                                                  (swap! tracker inc))
+                                                :num-workers num-workers)]
+        (wait-for-messages num-workers 1000)
         ; wait a bit to make sure nothing else gets grabbed
         (Thread/sleep 200)
         (is (= @tracker num-workers))
@@ -205,16 +213,14 @@
     (sqs-test/with-temporary-queue
       [queue-name dlq-name]
       (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
-            _ (doseq [i (range 10)] (sqs/enqueue connection i))
+            num-messages 10
+            _ (doseq [i (range num-messages)] (sqs/enqueue connection i))
             start (System/currentTimeMillis)
             consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
-
-        (with-timeout 1000000
-          (while (< @tracker 10)
-            (Thread/sleep 100)))
+        (wait-for-messages num-messages 100000)
         (println "total: " (- (System/currentTimeMillis) start))
         (Thread/sleep 100)
-        (is (= 10 @tracker))
+        (is (= num-messages @tracker))
         (sqs-server/stop-consumer consumer)))))
 
 (deftest ^:integration consumer-continues-processing
@@ -222,22 +228,17 @@
     (binding [sqs/poll-timeout-seconds 0]
       (sqs-test/with-temporary-queue
         [queue-name dlq-name]
-        (let [
-               connection (sqs/mk-connection queue-name :dead-letter dlq-name)
-               _ (doseq [i (range 5)] (sqs/enqueue connection i))
-               consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
-
-          (with-timeout 10000
-            (while (< @tracker 5)
-              (Thread/sleep 100)))
-          (is (= 5 @tracker))
+        (let [num-messages 5
+              connection (sqs/mk-connection queue-name :dead-letter dlq-name)
+              _ (doseq [i (range num-messages)] (sqs/enqueue connection i))
+              consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
+          (wait-for-messages num-messages 10000)
+          (is (= num-messages @tracker))
           ; wait for a bit to simulate no messages on the queue for a while
           (Thread/sleep 2000)
-          (doseq [i (range 5)] (sqs/enqueue connection i))
-          (with-timeout 10000
-            (while (< @tracker 10)
-              (Thread/sleep 100)))
-          (is (= 10 @tracker))
+          (doseq [i (range num-messages)] (sqs/enqueue connection i))
+          (wait-for-messages (* num-messages 2) 10000)
+          (is (= (* num-messages 2) @tracker))
           (sqs-server/stop-consumer consumer))))))
 
 (deftest ^:integration stop-consumer
@@ -245,8 +246,7 @@
     (sqs-test/with-temporary-queue
       [queue-name dlq-name]
       ;; Work with a test queue.
-      (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
-            consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
+      (let [consumer (sqs-server/start-consumer queue-name compute :dl-queue-name dlq-name)]
         (is (false? (.closed? (:message-channel consumer))))
         (is (false? (.closed? (:done-channel consumer))))
         (sqs-server/stop-consumer consumer)
@@ -259,7 +259,6 @@
       [queue-name dlq-name]
       (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
             _ (sqs/enqueue connection "hello")
-            start (System/currentTimeMillis)
             consumer (sqs-server/start-consumer
                        queue-name
                        (fn [message done-channel]
@@ -270,10 +269,7 @@
                                         (assoc message :nack (= t 0)))
                                   (inc t))))
                        :dl-queue-name dlq-name)]
-        (with-timeout 1000000
-          (while (< @tracker 2)
-            (Thread/sleep 100)))
-        (println "total: " (- (System/currentTimeMillis) start))
+        (wait-for-messages 2 10000)
         (Thread/sleep 100)
         (is (= 2 @tracker))
         (sqs-server/stop-consumer consumer)))))
@@ -286,16 +282,14 @@
           _ (cp/upmap 100 (partial sqs/enqueue connection) (range n))
           start (System/currentTimeMillis)
           consumer (apply sqs-server/start-consumer
-                     (concat [queue-name simple-compute :dl-queue-name dlq-name]
-                       (reduce-kv conj [] args)))]
+                          (concat [queue-name simple-compute :dl-queue-name dlq-name]
+                                  (reduce-kv conj [] args)))]
 
-      (with-timeout 1000000
-        (while (< @tracker n)
-          (Thread/sleep 100)))
+      (wait-for-messages n 1000000)
       (println (format "n %d, num-workers %d, num-listeners %d, dequeue-limit %d, time (ms): %d"
-                 n num-workers num-listeners dequeue-limit
-                 (- (System/currentTimeMillis) start)))
-      (Thread/sleep 10000)
+                       n num-workers num-listeners dequeue-limit
+                       (- (System/currentTimeMillis) start)))
+      (Thread/sleep 3000)
       (is (= n @tracker))
       ;; NB These tests sometimes end in AWS NonExistentQueue exception if not all
       ;; messages have been ack'd when the queue is deleted
@@ -316,3 +310,24 @@
     (time-consumer :n 1000 :num-workers 100 :num-listeners 10 :dequeue-limit 10) ; time (ms):   778
     (reset! tracker 0)
     (time-consumer :n 1000 :num-listeners 10 :dequeue-limit 10))) ; time (ms):   748
+
+;; run this to see how good squeedo works with cpu and async non-blocking IO
+;; on my 8 core machine i can drive cpu usage to 750%
+(deftest ^:manual example-awesome-cpu-usage
+  (sqs-test/with-temporary-queue
+    [queue-name dlq-name]
+    (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
+          intense-cpu-fn #(eat-some-cpu 1000000)
+          intense-compute-fn (fn  [message done-channel]
+                               (intense-cpu-fn)
+                               (async-get "http://google.com" message done-channel intense-cpu-fn))
+          num-messages 3000
+          _ (cp/upmap 100 (partial sqs/enqueue connection) (range num-messages))
+          start (System/currentTimeMillis)
+          consumer (sqs-server/start-consumer queue-name intense-compute-fn :dl-queue-name dlq-name :num-listeners 10 :max-concurrent-work 50)]
+
+      (wait-for-messages num-messages 1000000)
+      (println "total: " (- (System/currentTimeMillis) start))
+      (Thread/sleep 100)
+      (is (= num-messages @tracker))
+      (sqs-server/stop-consumer consumer))))
