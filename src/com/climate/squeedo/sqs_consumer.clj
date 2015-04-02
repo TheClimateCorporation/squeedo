@@ -37,9 +37,9 @@
     [message-channel buf]))
 
 (defn- create-workers
-  "Create workers to actually run the compute function. Workers are expected to be CPU bound
-   or handle all IO in an asynchronous manner.  In the future we may add an option to run computes
-   in a thread/pool that isn't part of the core.async's threadpool."
+  "Create workers to run the compute function. Workers are expected to be CPU bound or handle all IO in an asynchronous
+  manner.  In the future we may add an option to run computes in a thread/pool that isn't part of the core.async's
+  threadpool."
   [connection worker-size max-concurrent-work message-channel compute]
   (let [done-channel (chan worker-size)
         ; the work-token-channel ensures we only have a fixed numbers of messages processed at one time
