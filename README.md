@@ -7,10 +7,10 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 
 ## Inspiration
 
-Squeedo's inspiration came from our continual need for to quickly process lots of messages from SQS. We found that the
+Squeedo's inspiration came from our continual need to quickly process lots of messages from SQS. We found that the
 code to support these processes was quite similar in that it often involved a lot of plumbing of listening to SQS,
 pulling messages,  processing them with some kind of threadpool and then acking them back.  The goal was to make this
-easier by somehow simply passing a compute function that would do handle all of the plumbing and allow us to focus on
+easier by somehow simply passing a compute function that would handle all of the plumbing and allow us to focus on
 the compute logic of what to do with the message.
 
 After several iterations of basing this plumbing code on threadpools, we quickly found that we couldn't get the kind of
