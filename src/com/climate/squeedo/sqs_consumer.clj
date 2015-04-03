@@ -77,7 +77,7 @@
     ; convert the varags list into a map
     (apply hash-map options)))
 
-(defn get-available-processors
+(defn- get-available-processors
   []
   (.availableProcessors (Runtime/getRuntime)))
 
@@ -101,12 +101,12 @@
   (or (:message-channel-size options)
       (* 20 listener-count)))
 
-(defn get-max-concurrent-work
+(defn- get-max-concurrent-work
   [worker-count options]
   (or (:max-concurrent-work options)
       worker-count))
 
-(defn get-dequeue-limit
+(defn- get-dequeue-limit
   [options]
   (or (:dequeue-limit options)
       10))

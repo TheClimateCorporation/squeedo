@@ -123,7 +123,7 @@
             dequeue-limit is 10"
       (with-redefs [sqs-server/create-queue-listener (fn [_ num-listeners message-channel-size dequeue-limit]
                                                        (is (= 20 message-channel-size))
-                                                       (is (= (-> (sqs-server/get-available-processors)
+                                                       (is (= (-> (#'sqs-server/get-available-processors)
                                                                   (- 1)
                                                                   (/ 10)
                                                                   int
@@ -133,7 +133,7 @@
                                                        [1])
                     sqs-server/create-workers (fn [_ num-workers _ _ _]
                                                 (is (= num-workers
-                                                       (- (sqs-server/get-available-processors)
+                                                       (- (#'sqs-server/get-available-processors)
                                                           1))))]
         (sqs-server/start-consumer "q" (fn [_ _] println) :dl-queue-name "q-dl")))
     (testing "message-channel-size can be configured"
