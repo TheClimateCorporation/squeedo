@@ -91,7 +91,7 @@
      :queue-url  queue-url}))
 
 (defn enqueue
-  [{:keys [client queue-name queue-url] :as connection} message]
+  [{:keys [client queue-name queue-url]} message]
   "Add a message to a queue."
   (log/debugf "Enqueueing %s to %s" message queue-name)
   (sqs/send client queue-url (pr-str message)))
@@ -105,7 +105,7 @@
   This does *not* remove the messages from the queue! For that, see ack.
 
   In case of exception, logs the exception and returns []."
-  [{:keys [client queue-name queue-url] :as connection}
+  [{:keys [client queue-name queue-url]}
    & {:keys [limit]
       :or {limit 10}}]
   ;; Log at debug so we don't spam about polling.
@@ -123,7 +123,7 @@
 
 (defn ack
   "Remove the message from the queue."
-  [{:keys [client] :as connection} message]
+  [{:keys [client]} message]
   (log/debugf "Acking message %s" message)
   (sqs/delete client message))
 
@@ -134,7 +134,7 @@
      message - the message to nack
      nack-visibility-seconds (optional) - How long to wait before retrying a failed compute request.
                                           Defaults to 0."
-  [{:keys [client queue-url] :as connection} message & [nack-visibility-seconds]]
+  [{:keys [client queue-url]} message & [nack-visibility-seconds]]
    (log/debugf "Nacking message %s" message)
    (sqs/change-message-visibility client queue-url message
                                   (int (or nack-visibility-seconds 0))))
