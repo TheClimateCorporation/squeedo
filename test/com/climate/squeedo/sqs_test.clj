@@ -17,7 +17,8 @@
     [com.climate.squeedo.sqs :as sqs]
     [com.climate.squeedo.test-utils :refer [with-temporary-queue]]
     [clojure.tools.reader.edn :as edn]
-    [cheshire.core :as json]))
+    [cheshire.core :as json]
+    [cemerick.bandalore :as band]))
 
 (deftest valid-queue-name
   (testing "Queue name validity with special characters"
@@ -120,6 +121,19 @@
           (let [msg (dequeue-1 dlq-connection)]
             (is (= :potato (edn/read-string (:body msg))))
             (when msg (sqs/ack dlq-connection msg))))))))
+
+(deftest ^:integration test-client-supplied-mk-connection
+  (with-temporary-queue
+    [queue-name]
+    (testing "supplying the client to use to make the connection utilizes my supplied client"
+      (let [my-client (band/create-client)
+            result-connection (sqs/mk-connection queue-name :client my-client)]
+        (is (= my-client (:client result-connection)))))
+    (testing "not supplying the client to use to make the connection creates a new one"
+          ;; Really just validating that AmazonSQSClient's equality is identity based.
+          (let [my-client (band/create-client)
+                result-connection (sqs/mk-connection queue-name)]
+            (is (not= my-client (:client result-connection)))))))
 
 (deftest ^:integration test-multi-dequeue
   (with-temporary-queue

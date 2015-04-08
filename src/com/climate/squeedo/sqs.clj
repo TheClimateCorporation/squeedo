@@ -77,11 +77,12 @@
   too many times will go.
   http://aws.typepad.com/aws/2014/01/amazon-sqs-new-dead-letter-queue.html
   "
-  [queue-name & {:keys [dead-letter]}]
+  [queue-name & {:keys [dead-letter
+                        client]}]
   (validate-queue-name! queue-name)
   (when dead-letter
     (validate-queue-name! dead-letter))
-  (let [client (sqs/create-client)
+  (let [client (or client (sqs/create-client))
         queue-url (if dead-letter
                     (get-queue client queue-name (get-queue client dead-letter))
                     (get-queue client queue-name))]
