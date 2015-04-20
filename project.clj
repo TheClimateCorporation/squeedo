@@ -23,7 +23,8 @@
                  [org.clojure/tools.logging "0.3.0"]
                  [cheshire/cheshire "5.3.1"]
                  [com.cemerick/bandalore "0.0.6"]
-                 [org.clojure/core.async "0.1.338.0-5c5012-alpha"]]
+                 [org.clojure/core.async "0.1.338.0-5c5012-alpha"]
+                 [com.amazonaws/aws-java-sdk "1.9.31"]]
 
   :profiles {:dev {:dependencies
                    [[lein-marginalia "0.7.1"]
