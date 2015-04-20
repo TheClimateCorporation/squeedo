@@ -17,14 +17,15 @@
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[joda-time "2.7"]
+                 [org.clojure/clojure "1.6.0"]
                  [org.clojure/tools.reader "0.8.3"]
                  [org.clojure/tools.cli "0.3.1"]
                  [org.clojure/tools.logging "0.3.0"]
                  [cheshire/cheshire "5.3.1"]
-                 [com.cemerick/bandalore "0.0.6"]
+                 [com.cemerick/bandalore "0.0.6" :exclusions [joda-time]]
                  [org.clojure/core.async "0.1.338.0-5c5012-alpha"]
-                 [com.amazonaws/aws-java-sdk "1.9.31"]]
+                 [com.amazonaws/aws-java-sdk "1.9.31" :exclusions [joda-time]]]
 
   :profiles {:dev {:dependencies
                    [[lein-marginalia "0.7.1"]
