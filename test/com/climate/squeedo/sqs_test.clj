@@ -75,22 +75,21 @@
             (sqs/ack connection-2 msg)
             ;; Remove it from messages atom, for use in future assertions.
             (swap! messages disj (edn/read-string (:body msg)))))
-        (testing "messages atom now again reflects the contents of the queue."
-          (let [other-message (first @messages)]
-            (let [msg (dequeue-1 connection-2)]
-              (testing "Read other message from the queue."
-                (is (= other-message (edn/read-string (:body msg)))))
-              ;; Put it back.
-              (sqs/nack connection-2 msg))
-            (let [msg (dequeue-1 connection-2)]
-              (testing "Read same message a second time, after nack-ing."
-                (is (= other-message (edn/read-string (:body msg)))))
-              ;; Don't put it back, just sleep so that it times out.
-              (Thread/sleep 7000)) ; 7s > auto-retry-seconds
-            (let [msg (dequeue-1 connection-2)]
-              (testing "If we don't ack a message (it times out), we get it again!"
-                (is (= other-message (edn/read-string (:body msg)))))
-              (sqs/ack connection-2 msg))))
+        (let [other-message (first @messages)]
+          (let [msg (dequeue-1 connection-2)]
+            (testing "Read other message from the queue."
+              (is (= other-message (edn/read-string (:body msg)))))
+            ;; Put it back.
+            (sqs/nack connection-2 msg))
+          (let [msg (dequeue-1 connection-2)]
+            (testing "Read same message a second time, after nack-ing."
+              (is (= other-message (edn/read-string (:body msg)))))
+            ;; Don't put it back, just sleep so that it times out.
+            (Thread/sleep 7000)) ; 7s > auto-retry-seconds
+          (let [msg (dequeue-1 connection-2)]
+            (testing "If we don't ack a message (it times out), we get it again!"
+              (is (= other-message (edn/read-string (:body msg)))))
+            (sqs/ack connection-2 msg)))
         ;; Queue is now empty
         (testing "Reading an empty queue times out and returns empty []."
           (is (empty? (sqs/dequeue connection-2))))
@@ -98,7 +97,6 @@
           (let [connection-3 (sqs/mk-connection queue-name)
                 _ (sqs/enqueue connection-1 :final-msg :message-attributes {:some-attribute "some-value"})
                 msg (dequeue-1 connection-3)]
-            (clojure.pprint/pprint msg)
             (is (= :final-msg (edn/read-string (:body msg))))
             (is (= "some-value" (:some-attribute (:message-attributes msg))))
             (sqs/ack connection-3 msg)))))))
