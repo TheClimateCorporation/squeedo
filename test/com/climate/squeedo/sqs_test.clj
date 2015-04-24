@@ -93,11 +93,14 @@
         ;; Queue is now empty
         (testing "Reading an empty queue times out and returns empty []."
           (is (empty? (sqs/dequeue connection-2))))
-        (testing " Just once more, write and read with message attributes."
+        (testing " Just once more, write and read with message attributes and non-default serialization."
           (let [connection-3 (sqs/mk-connection queue-name)
-                _ (sqs/enqueue connection-1 :final-msg :message-attributes {:some-attribute "some-value"})
+                input-message  {:final-msg {:ayy "lmao"}}
+                _ (sqs/enqueue connection-1 input-message
+                               :message-attributes {:some-attribute "some-value"}
+                               :serialization-fn json/generate-string)
                 msg (dequeue-1 connection-3)]
-            (is (= :final-msg (edn/read-string (:body msg))))
+            (is (= (json/generate-string input-message) (:body msg)))
             (is (= "some-value" (:some-attribute (:message-attributes msg))))
             (sqs/ack connection-3 msg)))))))
 

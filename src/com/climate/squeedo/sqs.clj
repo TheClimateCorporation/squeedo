@@ -119,17 +119,21 @@
   queue-connection - A connection to a queue made with mk-connection
   message - The message to be placed on the queue
   Optional arguments:
-  :message-attributes - A map of SQS Attributes to apply to this message."
+  :message-attributes - A map of SQS Attributes to apply to this message.
+  :serialization-fn - A function that serializes the message you want to enqueue to a string
+    By default, pr-str will be used"
   [queue-connection message & opts]
   (let [{:keys [client queue-name queue-url]} queue-connection
-        {:keys [message-attributes]} opts]
+        {:keys [message-attributes
+                serialization-fn]
+         :or {serialization-fn pr-str}} opts]
     (log/debugf "Enqueueing %s to %s" message queue-name)
-    (send-message client queue-url (pr-str message) message-attributes)))
+    (send-message client queue-url (serialization-fn message) message-attributes)))
 
-(defn- clojurify-message-attributes [msg]
+(defn- clojurify-message-attributes [^Message msg]
   (let [javafied-message-attributes (.getMessageAttributes msg)]
     (->> javafied-message-attributes
-         (map (fn [[k mav]] [(keyword k) (.getStringValue mav)]))
+         (map (fn [[k ^MessageAttributeValue mav]] [(keyword k) (.getStringValue mav)]))
          (into {}))))
 
 (defn- message-map
