@@ -178,10 +178,7 @@
                                                visibility
                                                wait-time-seconds
                                                ^java.util.Collection attributes
-                                               ^java.util.Collection message-attribute-names]
-                                        :or {limit 1
-                                             attributes #{"All"}
-                                             message-attribute-names #{"All"}}}]
+                                               ^java.util.Collection message-attribute-names]}]
   (let [req (-> (ReceiveMessageRequest. queue-url)
               (.withMaxNumberOfMessages (-> limit (min 10) (max 1) int Integer/valueOf))
               (.withAttributeNames attributes)
@@ -202,14 +199,21 @@
 
   In case of exception, logs the exception and returns []."
   [{:keys [client queue-name queue-url]}
-   & {:keys [limit]
-      :or {limit 10}}]
+   & {:keys [limit attributes message-attributes]
+      :or {limit 10
+           attributes #{"All"}
+           message-attributes #{"All"}}}]
   ;; Log at debug so we don't spam about polling.
   (log/debugf "Attempting dequeue from %s" queue-name)
   ;; will have a single queue/connection
   (try
     (->>
-      (receive client queue-url :wait-time-seconds poll-timeout-seconds :limit limit :attributes #{"All"})
+      (receive client
+               queue-url
+               :wait-time-seconds poll-timeout-seconds
+               :limit limit
+               :attributes attributes
+               :message-attribute-names message-attributes)
       (map (fn [m]
              (log/debugf "Dequeued from queue %s message %s" queue-name m)
              (assoc m :queue-name queue-name))))
