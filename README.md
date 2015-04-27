@@ -7,7 +7,8 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 
 ## Latest version
 
-[![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg)](http://clojars.org/com.climate/squeedo)
+[![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg )](http://clojars.org/com.climate/squeedo )
+
 [![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
 
 ## Inspiration 
