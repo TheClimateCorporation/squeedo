@@ -14,7 +14,9 @@
   (:require
     [cemerick.bandalore :as sqs]
     [cheshire.core :as json]
-    [clojure.tools.logging :as log]))
+    [clojure.tools.logging :as log])
+  (:import [com.amazonaws.services.sqs.model MessageAttributeValue SendMessageRequest ReceiveMessageRequest Message]
+           [com.amazonaws.services.sqs AmazonSQSClient]))
 
 (def ^:dynamic auto-retry-seconds
   "How long to wait before retrying a non-responding compute request."
@@ -91,11 +93,102 @@
      :queue-name queue-name
      :queue-url  queue-url}))
 
+(defn- build-msg-attributes
+  "A simple helper function to turn a Clojure keyword map into a Map<String,MessageAttributeValue>"
+  [message-attribute-map]
+  (when message-attribute-map
+    (into {}
+          (map (fn [[k v]] [(name k) (-> (MessageAttributeValue.)
+                                         (.withStringValue (str v))
+                                         (.withDataType "String"))])
+               message-attribute-map))))
+
+(defn- send-message
+  "Sends a new message with the given string body to the queue specified
+  by the string URL.  Returns a map with :id and :body-md5 slots."
+  [^AmazonSQSClient client queue-url message & [message-attributes]]
+  (let [message-attribute-value-map (build-msg-attributes message-attributes)
+        send-message-request (cond-> (SendMessageRequest. queue-url message)
+                               message-attribute-value-map (.withMessageAttributes message-attribute-value-map))
+        resp (.sendMessage client send-message-request)]
+    {:id (.getMessageId resp)
+     :body-md5 (.getMD5OfMessageBody resp)}))
+
 (defn enqueue
-  [{:keys [client queue-name queue-url]} message]
-  "Add a message to a queue."
-  (log/debugf "Enqueueing %s to %s" message queue-name)
-  (sqs/send client queue-url (pr-str message)))
+  "Enqueues a message to a queue
+  Arguments:
+  queue-connection - A connection to a queue made with mk-connection
+  message - The message to be placed on the queue
+  Optional arguments:
+  :message-attributes - A map of SQS Attributes to apply to this message.
+  :serialization-fn - A function that serializes the message you want to enqueue to a string
+    By default, pr-str will be used"
+  [queue-connection message & opts]
+  (let [{:keys [client queue-name queue-url]} queue-connection
+        {:keys [message-attributes
+                serialization-fn]
+         :or {serialization-fn pr-str}} opts]
+    (log/debugf "Enqueueing %s to %s" message queue-name)
+    (send-message client queue-url (serialization-fn message) message-attributes)))
+
+(defn- clojurify-message-attributes [^Message msg]
+  (let [javafied-message-attributes (.getMessageAttributes msg)]
+    (->> javafied-message-attributes
+         (map (fn [[k ^MessageAttributeValue mav]] [(keyword k) (.getStringValue mav)]))
+         (into {}))))
+
+(defn- message-map
+  [queue-url ^Message msg]
+  {:attributes (.getAttributes msg)
+   :message-attributes (clojurify-message-attributes msg)
+   :body (.getBody msg)
+   :body-md5 (.getMD5OfBody msg)
+   :id (.getMessageId msg)
+   :receipt-handle (.getReceiptHandle msg)
+   :source-queue queue-url})
+
+(defn- receive
+  "Receives one or more messages from the queue specified by the given URL.
+   Optionally accepts keyword arguments:
+
+   :limit - between 1 (default) and 10, the maximum number of messages to receive
+   :visibility - seconds the received messages should not be delivered to other
+             receivers; defaults to the queue's visibility attribute
+   :attributes - a collection of string names of :attributes to include in
+             received messages; e.g. #{\"All\"} will include all attributes,
+             #{\"SentTimestamp\"} will include only the SentTimestamp attribute, etc.
+             Defaults to the empty set (i.e. no attributes will be included in
+             received messages).
+             See the SQS documentation for all support message attributes.
+   :wait-time-seconds - enables long poll support. time is in seconds, bewteen
+             0 (default - no long polling) and 20.
+             Allows Amazon SQS service to wait until a message is available
+             in the queue before sending a response.
+             See the SQS documentation at (http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-long-polling.html)
+
+   Returns a seq of maps with these slots:
+
+   :attributes - message attributes
+   :body - the string body of the message
+   :body-md5 - the MD5 checksum of :body
+   :id - the message's ID
+   :receipt-handle - the ID used to delete the message from the queue after
+             it has been fully processed.
+   :source-queue - the URL of the queue from which the message was received"
+  [^AmazonSQSClient client queue-url & {:keys [limit
+                                               visibility
+                                               wait-time-seconds
+                                               ^java.util.Collection attributes
+                                               ^java.util.Collection message-attribute-names]}]
+  (let [req (-> (ReceiveMessageRequest. queue-url)
+              (.withMaxNumberOfMessages (-> limit (min 10) (max 1) int Integer/valueOf))
+              (.withAttributeNames attributes)
+              (.withMessageAttributeNames message-attribute-names))
+        req (if wait-time-seconds (.withWaitTimeSeconds req (Integer/valueOf (int wait-time-seconds))) req)
+        req (if visibility (.withVisibilityTimeout req (Integer/valueOf (int visibility))) req)]
+    (->> (.receiveMessage client req)
+      .getMessages
+      (map (partial message-map queue-url)))))
 
 ;; Raw message is being returned, so it's up to the user to determine the proper reader for their needs.
 ;; NaN,Infinity,-Infinity http://dev.clojure.org/jira/browse/CLJ-1074
@@ -107,14 +200,21 @@
 
   In case of exception, logs the exception and returns []."
   [{:keys [client queue-name queue-url]}
-   & {:keys [limit]
-      :or {limit 10}}]
+   & {:keys [limit attributes message-attributes]
+      :or {limit 10
+           attributes #{"All"}
+           message-attributes #{"All"}}}]
   ;; Log at debug so we don't spam about polling.
   (log/debugf "Attempting dequeue from %s" queue-name)
   ;; will have a single queue/connection
   (try
     (->>
-      (sqs/receive client queue-url :wait-time-seconds poll-timeout-seconds :limit limit)
+      (receive client
+               queue-url
+               :wait-time-seconds poll-timeout-seconds
+               :limit limit
+               :attributes attributes
+               :message-attribute-names message-attributes)
       (map (fn [m]
              (log/debugf "Dequeued from queue %s message %s" queue-name m)
              (assoc m :queue-name queue-name))))
