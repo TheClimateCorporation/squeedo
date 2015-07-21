@@ -5,7 +5,12 @@ Squeedo: The sexiest message consumer ever (™)
 This library allows you to quickly spin up a message consumer and worker pool using core.async. The message is returned
 in its raw format, so it's up to the caller to determine the proper reader for their purposes.
 
-## Inspiration
+## Latest version
+
+[![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg )](http://clojars.org/com.climate/squeedo )
+[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
+
+## Inspiration 
 
 Squeedo's inspiration came from our continual need to quickly process lots of messages from SQS. We found that the
 code to support these processes was quite similar in that it often involved a lot of plumbing of listening to SQS,

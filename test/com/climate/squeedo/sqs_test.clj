@@ -17,7 +17,8 @@
     [com.climate.squeedo.sqs :as sqs]
     [com.climate.squeedo.test-utils :refer [with-temporary-queue]]
     [clojure.tools.reader.edn :as edn]
-    [cheshire.core :as json]))
+    [cheshire.core :as json]
+    [cemerick.bandalore :as band]))
 
 (deftest valid-queue-name
   (testing "Queue name validity with special characters"
@@ -75,13 +76,12 @@
             (sqs/ack connection-2 msg)
             ;; Remove it from messages atom, for use in future assertions.
             (swap! messages disj (edn/read-string (:body msg)))))
-        ;; messages atom now again reflects the contents of the queue.
         (let [other-message (first @messages)]
           (let [msg (dequeue-1 connection-2)]
             (testing "Read other message from the queue."
               (is (= other-message (edn/read-string (:body msg)))))
-              ;; Put it back.
-              (sqs/nack connection-2 msg))
+            ;; Put it back.
+            (sqs/nack connection-2 msg))
           (let [msg (dequeue-1 connection-2)]
             (testing "Read same message a second time, after nack-ing."
               (is (= other-message (edn/read-string (:body msg)))))
@@ -94,12 +94,16 @@
         ;; Queue is now empty
         (testing "Reading an empty queue times out and returns empty []."
           (is (empty? (sqs/dequeue connection-2))))
-        ;; Just once more, write and read.
-        (let [connection-3 (sqs/mk-connection queue-name)
-              _ (sqs/enqueue connection-1 :final-msg)
-              msg (dequeue-1 connection-3)]
-          (is (= :final-msg (edn/read-string (:body msg))))
-          (sqs/ack connection-3 msg))))))
+        (testing " Just once more, write and read with message attributes and non-default serialization."
+          (let [connection-3 (sqs/mk-connection queue-name)
+                input-message  {:final-msg {:ayy "lmao"}}
+                _ (sqs/enqueue connection-1 input-message
+                               :message-attributes {:some-attribute "some-value"}
+                               :serialization-fn json/generate-string)
+                msg (dequeue-1 connection-3)]
+            (is (= (json/generate-string input-message) (:body msg)))
+            (is (= "some-value" (:some-attribute (:message-attributes msg))))
+            (sqs/ack connection-3 msg)))))))
 
 (deftest ^:integration test-dead-letter-redrive
   (with-temporary-queue
@@ -120,6 +124,19 @@
           (let [msg (dequeue-1 dlq-connection)]
             (is (= :potato (edn/read-string (:body msg))))
             (when msg (sqs/ack dlq-connection msg))))))))
+
+(deftest ^:integration test-client-supplied-mk-connection
+  (with-temporary-queue
+    [queue-name]
+    (testing "supplying the client to use to make the connection utilizes my supplied client"
+      (let [my-client (band/create-client)
+            result-connection (sqs/mk-connection queue-name :client my-client)]
+        (is (= my-client (:client result-connection)))))
+    (testing "not supplying the client to use to make the connection creates a new one"
+          ;; Really just validating that AmazonSQSClient's equality is identity based.
+          (let [my-client (band/create-client)
+                result-connection (sqs/mk-connection queue-name)]
+            (is (not= my-client (:client result-connection)))))))
 
 (deftest ^:integration test-multi-dequeue
   (with-temporary-queue
