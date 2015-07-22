@@ -32,18 +32,25 @@
   queue."
   3)
 
+(def ^:const invalid-queue-message
+  (str "Queue names can only include alphanumeric characters "
+       "hyphens, or underscores. Queue name should be less than "
+       "80 characters."))
+
+(defn valid-queue-name?
+  "Returns true if an SQS queue name is valid, false otherwise"
+  [queue-name]
+  (not (or (empty? queue-name)
+           (re-find #"[^A-Za-z0-9_-]" queue-name)
+           (>= (count queue-name) 80))))
+
 (defn validate-queue-name!
   "Validates input for SQS queue names.
 
   Returns nil, or throws an IllegalArgumentException on invalid queue name."
   [queue-name]
-  (when (or (empty? queue-name)
-          (re-find #"[^A-Za-z0-9_-]" queue-name)
-          (>= (count queue-name) 80))
-    (throw (IllegalArgumentException.
-             (str "Queue names can only include alphanumeric characters"
-               " hyphens, or underscores. Queue name should be less than"
-               " 80 characters.")))))
+  (when-not (valid-queue-name? queue-name)
+    (throw (IllegalArgumentException. invalid-queue-message))))
 
 (defn- redrive-policy
   "Encode the RedrivePolicy for a dead letter queue.
