@@ -126,22 +126,12 @@ Typical project.clj configuration to setup the servlet context listener hooks:
 One of the great things about Squeedo is the advanced configuration options that can be used to tune the consumer to
 your workflow beyond what the very reasonable defaults do out of the box.
 
-* **:message-channel-size** - the number of messages to prefetch from SQS; default 20 * num-listeners. Prefetching
-messages allow us to keep the compute function continuously busy without having to wait for more to be first pulled from
-the remote SQS queue. Make sure to set the timeout appropriately when you create the queue.
-* **:num-workers** - the number of workers processing messages concurrently.  This controls how many workers actually
-process messages at any one time. (defaults to number of CPU's - 1 or 1 if single core). Squeedo works best with 2 or
-more CPU's so don't change this unless you feel adventurous.  This is not the amount of work that can be outstanding at
-any one time, that is controlled below with :max-concurrent-work.
-* **:num-listeners** - the number of listeners polling from SQS. default is (num-workers / 10) since each listener
-dequeues up to 10 messages at a time.  If you have a really fast process, you can actually starve the compute function
-of messages and thus need more listeners pulling from SQS.
+* **:message-channel-size** - the number of messages to prefetch from SQS; default 20 * num-listeners. Prefetching messages allow us to keep the compute function continuously busy without having to wait for more to be first pulled from the remote SQS queue. Make sure to set the timeout appropriately when you create the queue.
+* **:num-workers** - the number of workers processing messages concurrently. This controls how many workers actually process messages at any one time. (defaults to number of CPU's - 1 or 1 if single core). Squeedo works best with 2 or more CPU's. This is not the amount of work that can be outstanding at any one time, that is controlled below with :max-concurrent-work.
+* **:num-listeners** - the number of listeners polling from SQS. default is (num-workers /dequeue-limit) since each listener dequeues up to dequeue-limit messages at a time. If you have a really fast process, you can actually starve the compute function of messages and thus need more listeners pulling from SQS.
 * **:dequeue-limit** - the number of messages to dequeue at a time; default 10
-* **:max-concurrent-work** - the maximum number of total messages processed.  This is mainly for async workflows where
-you can have work started and waiting for parked IO threads to complete; default num-workers.  This allows you to always
-keep the CPU's busy by having data returned by IO ready to be processed.  Its really a memory game at this point.
-* **:dl-queue-name** - the dead letter queue to which messages that are failed the maximum number of times will go (will
-be created if necessary). Defaults to (str queue-name \"-failed\")
+* **:max-concurrent-work** - the maximum number of total messages processed concurrently. This is mainly for async workflows where you can have work started and are waiting for parked IO threads to complete; default num-workers. This allows you to always keep the CPU's busy by having data returned by IO ready to be processed. Its really a memory game at this point -- how much data you can buffer that's ready to be processed by your asynchronous http clients.
+* **:dl-queue-name** - the dead letter SQS queue to which repeatedly failed messages will go.  A message that fails to process the maximum number of SQS receives is sent to the dead letter queue. (see SQS Redrive Policy)  The queue will be created if necessary.  Defaults to (str QUEUE-NAME \”-failed\”) where QUEUE-NAME is the name of the queue passed into the start-consumer function.
 
 ## Additional goodies
 
