@@ -88,9 +88,9 @@
   too many times will go.
   http://aws.typepad.com/aws/2014/01/amazon-sqs-new-dead-letter-queue.html
 
-  Also optionally attribute maps for the main queue and the dead letter queue
-  can be passed. Attributes must be maps from string to string, with keys matching
-  standard SQS attribute names
+  Also, it optionally takes attribute maps for the main queue and the dead letter
+  queue. These must be maps from string to string, with keys matching standard
+  SQS attribute names
   "
   [queue-name & {:keys [dead-letter
                         client
