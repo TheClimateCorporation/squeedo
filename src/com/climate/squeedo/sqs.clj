@@ -55,11 +55,11 @@
 (defn- redrive-policy
   "Encode the RedrivePolicy for a dead letter queue.
   http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/SQSDeadLetterQueue.html"
-  [client dead-letter-queue]
+  [client dead-letter-queue-url]
   {"RedrivePolicy"
     (json/generate-string                                   ; yes, this is really necessary.
       {"maxReceiveCount"     maximum-retries
-       "deadLetterTargetArn" ((sqs/queue-attrs client dead-letter-queue)
+       "deadLetterTargetArn" ((sqs/queue-attrs client dead-letter-queue-url)
                               "QueueArn")})})
 
 (defn- get-queue
@@ -67,7 +67,7 @@
 
   Optionally takes a dead letter queue URL (Amazon Resource Name),
   a queue that already exists, that gets associated with the returned queue."
-    [client queue-name & [dead-letter-arn]]
+    [client queue-name queue-atts & [dead-letter-url]]
   (let [default-attrs {"DelaySeconds"                  0    ; delay after enqueue
                        "MessageRetentionPeriod"        1209600 ; max, 14 days
                        "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
@@ -75,7 +75,9 @@
         ; Tip: don't try sending attrs as create-queue's 'options' param: they aren't the same
         q (sqs/create-queue client queue-name)]
     (sqs/queue-attrs client q
-      (merge default-attrs (when dead-letter-arn (redrive-policy client dead-letter-arn))))
+                     (merge default-attrs
+                            queue-atts
+                            (when dead-letter-url (redrive-policy client dead-letter-url))))
     q))
 
 (defn mk-connection
@@ -85,20 +87,33 @@
   Optionally takes the name of a dead-letter queue, where messages that failed
   too many times will go.
   http://aws.typepad.com/aws/2014/01/amazon-sqs-new-dead-letter-queue.html
+
+  Also, it optionally takes attribute maps for the main queue and the dead letter
+  queue. These must be maps from string to string, with keys matching standard
+  SQS attribute names
   "
   [queue-name & {:keys [dead-letter
-                        client]}]
+                        client
+                        queue-attributes
+                        dead-letter-queue-attributes]}]
   (validate-queue-name! queue-name)
   (when dead-letter
     (validate-queue-name! dead-letter))
   (let [client (or client (sqs/create-client))
+        dead-letter-connection (when dead-letter
+                                 (mk-connection dead-letter
+                                                :client client
+                                                :queue-attributes dead-letter-queue-attributes))
         queue-url (if dead-letter
-                    (get-queue client queue-name (get-queue client dead-letter))
-                    (get-queue client queue-name))]
+                    (get-queue client queue-name queue-attributes (:queue-url dead-letter-connection))
+                    (get-queue client queue-name queue-attributes))]
     (log/infof "Using SQS queue %s at %s" queue-name queue-url)
-    {:client     client
-     :queue-name queue-name
-     :queue-url  queue-url}))
+    (merge
+     {:client     client
+      :queue-name queue-name
+      :queue-url  queue-url}
+     (when dead-letter
+       {:dead-letter (dissoc dead-letter-connection :client)}))))
 
 (defn- build-msg-attributes
   "A simple helper function to turn a Clojure keyword map into a Map<String,MessageAttributeValue>"
