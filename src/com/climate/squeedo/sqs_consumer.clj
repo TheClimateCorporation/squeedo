@@ -142,6 +142,8 @@
        :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
                         times will go (will be created if necessary).
                         Defaults to (str queue-name \"-failed\")
+       :client        : the bandalore sqs client to use (if missing, sqs/mk-connetion will create
+                        the client
    outputs:
     a map with keys, :done-channel - the channel to send messages to be acked
                      :message-channel - unused by the client.
@@ -149,7 +151,9 @@
   [queue-name compute & opts]
   (let [options (->options-map opts)
         dead-letter-queue-name (get-dead-letter-queue-name queue-name options)
-        connection (gsqs/mk-connection queue-name :dead-letter dead-letter-queue-name)
+        connection (gsqs/mk-connection queue-name
+                                       :dead-letter dead-letter-queue-name
+                                       :client      (:client options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
         message-channel-size (get-message-channel-size listener-count options)
