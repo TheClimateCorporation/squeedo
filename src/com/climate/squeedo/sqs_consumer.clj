@@ -143,7 +143,7 @@
                         times will go (will be created if necessary).
                         Defaults to (str queue-name \"-failed\")
        :client        : the bandalore sqs client to use (if missing, sqs/mk-connetion will create
-                        the client
+                        the client)
    outputs:
     a map with keys, :done-channel - the channel to send messages to be acked
                      :message-channel - unused by the client.
