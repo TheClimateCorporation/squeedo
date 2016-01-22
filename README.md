@@ -10,7 +10,7 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 [![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg )](http://clojars.org/com.climate/squeedo )
 [![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
 
-## Inspiration 
+## Inspiration
 
 Squeedo's inspiration came from our continual need to quickly process lots of messages from SQS. We found that the
 code to support these processes was quite similar in that it often involved a lot of plumbing of listening to SQS,
@@ -41,13 +41,13 @@ In its simplest form, Squeedo is composed of only 2 parts, a compute function an
 (defn compute
   [message done-channel]
   (println message)
-  ;; never or limit the use of blocking IO calls here, use http-kit for these calls 
+  ;; never or limit the use of blocking IO calls here, use http-kit for these calls
   (put! done-channel message)))
-  
+
 (def consumer (start-consumer "my-sqs-queue" compute))
 
 ;;when done listening
-(stop-consumer consumer)  
+(stop-consumer consumer)
 ```
 
 The compute function must post to the done-channel even for exceptions.  This will ack/nack each message.  Squeedo
@@ -78,12 +78,12 @@ process.
   (eat-some-cpu 1000000)
   ; do this if you will have I/O
   (async-get "http://google.com" message done-channel))
-  
+
 (def consumer (start-consumer "my-sqs-queue" compute :num-listeners 10 :max-concurrent-work 50))
- 
+
 ;;when done listening
-;; (stop-consumer consumer) 
-  
+;; (stop-consumer consumer)
+
 ```
 
 ## Usage in Jetty based Ring app
@@ -132,6 +132,7 @@ your workflow beyond what the very reasonable defaults do out of the box.
 * **:dequeue-limit** - the number of messages to dequeue at a time; default 10
 * **:max-concurrent-work** - the maximum number of total messages processed concurrently. This is mainly for async workflows where you can have work started and are waiting for parked IO threads to complete; default num-workers. This allows you to always keep the CPU's busy by having data returned by IO ready to be processed. Its really a memory game at this point -- how much data you can buffer that's ready to be processed by your asynchronous http clients.
 * **:dl-queue-name** - the dead letter SQS queue to which repeatedly failed messages will go.  A message that fails to process the maximum number of SQS receives is sent to the dead letter queue. (see SQS Redrive Policy)  The queue will be created if necessary.  Defaults to (str QUEUE-NAME \”-failed\”) where QUEUE-NAME is the name of the queue passed into the start-consumer function.
+* **:client** - the SQS client used to start the consumer. By default an SQS client is created internally using instance credentials, but a client can be passed in to be used. This allows you to use a client you may have already created with some specific properties (e.g. manually overridden AWS credentials).
 
 ## Additional goodies
 

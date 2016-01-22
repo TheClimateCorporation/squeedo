@@ -114,9 +114,9 @@
   nil)
 
 (deftest verify-opts-to-start-consumer
-  (with-redefs [sqs/mk-connection (fn [_ _ _] {:client "client"
-                                               :queue-name "q"
-                                               :queue-url "http://"})]
+  (with-redefs [sqs/mk-connection (fn [& _] {:client     "client"
+                                             :queue-name "q"
+                                             :queue-url  "http://"})]
     (testing "message-channel-size defaults to 20 and
             worker-size defaults to number of cpus - 1 and
             num-listeners is 1
@@ -155,7 +155,7 @@
                     sqs-server/create-workers (fn [_ _ _ _ _] nil)]
         (sqs-server/start-consumer "q" stub-compute-fn :num-listeners 10 :dl-queue-name "q-dl"))))
   (testing "dl-queue-name defaults to queue-name-failed"
-    (with-redefs [sqs/mk-connection (fn [q-name _ dl-queue-name]
+    (with-redefs [sqs/mk-connection (fn [q-name _ dl-queue-name _ _]
                                       (is (= "q-failed" dl-queue-name))
                                       (is (= "q" q-name))
                                       {:client "client"
@@ -172,20 +172,22 @@
           message-channel-size 35
           max-concurrent-work 36
           dequeue-limit 37
+          my-client     "my client"
           options-map {:dl-queue-name        dead-letter-queue-name
                        :num-workers          worker-count
                        :num-listeners        listener-count
                        :message-channel-size message-channel-size
                        :max-concurrent-work  max-concurrent-work
-                       :dequeue-limit        dequeue-limit}
-          stub-connection {:client     "client"
+                       :dequeue-limit        dequeue-limit
+                       :client               my-client}
+          stub-connection {:client     my-client
                            :queue-name queue-name
                            :queue-url  "http://"}
           stub-message-channel 1]
-      (with-redefs [sqs/mk-connection (fn [input-queue-name input-option-keyword input-option-value]
+      (with-redefs [sqs/mk-connection (fn [input-queue-name & {:keys [dead-letter client]}]
                                         (is (= queue-name input-queue-name))
-                                        (is (= :dead-letter input-option-keyword))
-                                        (is (= dead-letter-queue-name input-option-value))
+                                        (is (= dead-letter-queue-name dead-letter))
+                                        (is (= my-client client))
                                         stub-connection)
                     sqs-server/create-queue-listener (fn [input-connection input-listener-count
                                                           input-message-channel-size input-dequeue-limit]
@@ -233,7 +235,7 @@
     (with-redefs [sqs/ack stub-compute-fn
                   sqs/dequeue (fn [_ _ _]
                                 {:id 1 :body "message"})
-                  sqs/mk-connection (fn [_ _ _] {})]
+                  sqs/mk-connection (fn [& _] {})]
       (let [num-workers 4
             consumer (sqs-server/start-consumer "queue-name"
                                                 (fn [_ _]
