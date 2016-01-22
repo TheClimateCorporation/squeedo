@@ -132,7 +132,7 @@ your workflow beyond what the very reasonable defaults do out of the box.
 * **:dequeue-limit** - the number of messages to dequeue at a time; default 10
 * **:max-concurrent-work** - the maximum number of total messages processed concurrently. This is mainly for async workflows where you can have work started and are waiting for parked IO threads to complete; default num-workers. This allows you to always keep the CPU's busy by having data returned by IO ready to be processed. Its really a memory game at this point -- how much data you can buffer that's ready to be processed by your asynchronous http clients.
 * **:dl-queue-name** - the dead letter SQS queue to which repeatedly failed messages will go.  A message that fails to process the maximum number of SQS receives is sent to the dead letter queue. (see SQS Redrive Policy)  The queue will be created if necessary.  Defaults to (str QUEUE-NAME \”-failed\”) where QUEUE-NAME is the name of the queue passed into the start-consumer function.
-* **:client** - the SQS client used to start the consumer. By default an SQS client in created internally using instance credentials, but a client can be passed in to be used. This allows you to use a connection you may have already created with some specific properties (e.g. manually overridden AWS credentials).
+* **:client** - the SQS client used to start the consumer. By default an SQS client is created internally using instance credentials, but a client can be passed in to be used. This allows you to use a client you may have already created with some specific properties (e.g. manually overridden AWS credentials).
 
 ## Additional goodies
 
