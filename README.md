@@ -21,7 +21,7 @@ the compute logic of what to do with the message.
 After several iterations of basing this plumbing code on threadpools, we quickly found that we couldn't get the kind of
 throughput we wanted simply by tuning only the number of threads.  We needed something more dynamic, that would adapt
 better to the number of cores it ran on and would squeeze every last bit of CPU from our EC2 instances. After reading
-this blog post http://martintrojer.github.io/clojure/2013/07/07/coreasync-and-blocking-io/ we were inspired to use
+this blog post http://martintrojer.github.io/clojure/2013/07/07/coreasync-and-blocking-io we were inspired to use
 core.async and Squeedo was born.
 
 ## Why use Squeedo?
