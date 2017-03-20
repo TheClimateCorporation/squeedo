@@ -17,23 +17,23 @@
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
-  :dependencies [[joda-time "2.9.1"]
-                 [org.clojure/clojure "1.8.0"]
-                 [org.clojure/tools.reader "0.10.0"]
-                 [org.clojure/tools.cli "0.3.3"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/tools.logging "0.3.1"]
-                 [cheshire/cheshire "5.5.0"]
-                 [com.cemerick/bandalore "0.0.6" :exclusions [joda-time]]
                  [org.clojure/core.async "0.2.374"]
-                 [com.amazonaws/aws-java-sdk "1.10.49" :exclusions [joda-time]]]
+                 [cheshire/cheshire "5.5.0"]
+                 [com.cemerick/bandalore "0.0.6"
+                  :exclusions [com.amazonaws/aws-java-sdk]]
+                 [com.amazonaws/aws-java-sdk-sqs "1.10.49"]]
 
   :profiles {:dev {:dependencies
-                   [[lein-marginalia "0.8.0"]
-                    [http-kit "2.1.19"]
-                    [com.climate/claypoole "1.1.1"]]}}
-  :plugins [[lein-marginalia "0.8.0"]]
+                   [[http-kit "2.1.19"]
+                    [com.climate/claypoole "1.1.4"]]}}
+
+  :plugins [[lein-marginalia "0.8.0"]
+            [lein-ancient "0.5.5"]]
 
   :test-selectors {:default #(not-any? % #{:integration :benchmark :manual})
                    :integration :integration
                    :benchmark :benchmark
+                   :manual :manual
                    :all (fn [_] true)})
