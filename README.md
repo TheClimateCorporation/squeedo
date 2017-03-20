@@ -146,7 +146,7 @@ Shoutouts to [Jeff Melching](https://github.com/jmelching), [Tim Chagnon](https:
 
 ## License
 
-Copyright (C) 2015 The Climate Corporation. Distributed under the Apache
+Copyright (C) 2017 The Climate Corporation. Distributed under the Apache
 License, Version 2.0.  You may not use this library except in compliance with
 the License. You may obtain a copy of the License at
 
