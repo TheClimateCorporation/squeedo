@@ -32,6 +32,8 @@
   :plugins [[lein-marginalia "0.8.0"]
             [lein-ancient "0.5.5"]]
 
+  :lein-release {:deploy-via :clojars}
+
   :test-selectors {:default #(not-any? % #{:integration :benchmark :manual})
                    :integration :integration
                    :benchmark :benchmark
