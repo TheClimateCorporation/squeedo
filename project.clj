@@ -19,7 +19,7 @@
             :distribution :repo}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/tools.logging "0.3.1"]
-                 [org.clojure/core.async "0.2.374"]
+                 [org.clojure/core.async "0.3.442"]
                  [cheshire "5.7.0"]
                  [com.cemerick/bandalore "0.0.6"
                   :exclusions [com.amazonaws/aws-java-sdk]]
