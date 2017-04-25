@@ -34,3 +34,19 @@
               ((mw/wrap-time-logger (fn [& _] (throw (Exception.))))
                ::msg ::chan)))
         (is (re-matches #"Compute took \d+ milliseconds" @log))))))
+
+(deftest uncaught-exception-logger
+  (testing "logs the consumer execution time"
+    (let [log (atom nil)]
+      (with-redefs [log/log* (fn [_ _ _ s] (reset! log s))]
+        (is (= ::msg ((mw/wrap-uncaught-exception-logger test-consumer) ::msg ::chan)))
+        (is (nil? @log))
+
+        (reset! log nil)
+        (is (thrown-with-msg?
+              Exception
+              #"test exception"
+              ((mw/wrap-uncaught-exception-logger
+                 (fn [& _] (throw (Exception. "test exception"))))
+               ::msg ::chan)))
+        (is (re-matches #"Error thrown by consumer handler" @log))))))

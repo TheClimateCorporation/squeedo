@@ -24,3 +24,14 @@
         (finally
           (log/infof "Compute took %s milliseconds"
                      (- (System/currentTimeMillis) start)))))))
+
+(defn wrap-uncaught-exception-logger
+  "Log uncaught exceptions that occur during the consumer handler.
+  Exceptions are logged and then rethrown."
+  [handler]
+  (fn [msg done-chan]
+    (try
+      (handler msg done-chan)
+      (catch Throwable t
+        (log/error t "Error thrown by consumer handler")
+        (throw t)))))
