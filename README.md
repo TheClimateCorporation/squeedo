@@ -52,7 +52,13 @@ In its simplest form, Squeedo is composed of only 2 parts, a compute function an
 
 The compute function must post to the done-channel even for exceptions.  This will ack/nack each message.  Squeedo
 listens to the done-channel to know when work is complete so it can pass your compute function another message to
-process.
+process. To nack a message (i.e., send update the visibility timeout for the message in SQS, so that it will be
+reporcessed again later, up until the configured MaxReceives for your queue), put the message back on the done-channel
+with a :nack key.
+
+```clojure
+(put! done-channel (assoc message :nack true))
+```
 
 ## http-kit example with non-blocking IO
 
