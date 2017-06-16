@@ -316,6 +316,28 @@
         (is (= 2 @tracker))
         (sqs-server/stop-consumer consumer)))))
 
+(deftest ^:integration nacking-timeout-works
+  (testing "Verify we can nack a message with a visibility timeout"
+    (with-temporary-queue
+      [queue-name dlq-name]
+      (let [connection (sqs/mk-connection queue-name :dead-letter dlq-name)
+            _ (sqs/enqueue connection "hello")
+            consumer (sqs-server/start-consumer
+                       queue-name
+                       (fn [message done-channel]
+                         (swap! tracker
+                                (fn [t]
+                                  ; nack the first time, ack after
+                                  (put! done-channel
+                                        (assoc message :nack (if (= t 0) 5 false)))
+                                  (inc t))))
+                       :dl-queue-name dlq-name)]
+        (is (thrown? TimeoutException (wait-for-messages 2 4000)))
+        (wait-for-messages 2 10000)
+        (Thread/sleep 100)
+        (is (= 2 @tracker))
+        (sqs-server/stop-consumer consumer)))))
+
 (defn- time-consumer
   [& {:keys [n num-workers num-listeners dequeue-limit] :as args}]
   (with-temporary-queue
