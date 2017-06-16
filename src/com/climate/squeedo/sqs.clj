@@ -257,7 +257,9 @@
      message - the message to nack
      nack-visibility-seconds (optional) - How long to wait before retrying a failed compute request.
                                           Defaults to 0."
-  [{:keys [client queue-url]} message & [nack-visibility-seconds]]
+  ([connection message]
+   (nack connection message 0))
+  ([{:keys [client queue-url]} message nack-visibility-seconds]
    (log/debugf "Nacking message %s" message)
    (sqs/change-message-visibility client queue-url message
-                                  (int (or nack-visibility-seconds 0))))
+                                  (int nack-visibility-seconds))))

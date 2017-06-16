@@ -61,9 +61,11 @@
           ; free up the work-token-channel
           (<! work-token-channel)
           ; (n)ack the message asynchronously
-          (if (:nack message)
-            (go (gsqs/nack connection message))
-            (go (gsqs/ack connection message)))
+          (let [nack (:nack message)]
+            (cond
+              (integer? nack) (go (gsqs/nack connection message (:nack message)))
+              nack            (go (gsqs/nack connection message))
+              :else           (go (gsqs/ack connection message))))
           (recur))))
     done-channel))
 
