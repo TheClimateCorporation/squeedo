@@ -14,24 +14,15 @@
   [handler]
   (wrap-deserialization-fn handler #(json/decode % true)))
 
-(defn wrap-time-logger
-  "Time a consumer handler"
-  [handler]
-  (fn [msg done-chan]
-    (let [start (System/currentTimeMillis)]
-      (try
-        (handler msg done-chan)
-        (finally
-          (log/infof "Compute took %s milliseconds"
-                     (- (System/currentTimeMillis) start)))))))
-
 (defn wrap-uncaught-exception-logger
   "Log uncaught exceptions that occur during the consumer handler.
   Exceptions are logged and then rethrown."
-  [handler]
-  (fn [msg done-chan]
-    (try
-      (handler msg done-chan)
-      (catch Throwable t
-        (log/error t "Error thrown by consumer handler")
-        (throw t)))))
+  ([handler]
+   (wrap-uncaught-exception-logger handler "Error thrown by consumer handler"))
+  ([handler log-msg]
+   (fn [msg done-chan]
+     (try
+       (handler msg done-chan)
+       (catch Throwable t
+         (log/error t log-msg)
+         (throw t))))))
