@@ -10,7 +10,7 @@
 ;; "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 ;; or implied.  See the License for the specific language governing permissions
 ;; and limitations under the License.
-(defproject com.climate/squeedo "0.1.5-SNAPSHOT"
+(defproject com.climate/squeedo "0.2.0-SNAPSHOT"
   :description "Squeedo: The sexiest message consumer ever (™)"
   :url "http://github.com/TheClimateCorporation/squeedo/"
   :min-lein-version "2.0.0"
@@ -26,11 +26,10 @@
                  [com.amazonaws/aws-java-sdk-sqs "1.11.98"]]
 
   :profiles {:dev {:dependencies
-                   [[http-kit "2.1.19"]
+                   [[http-kit "2.2.0"]
                     [com.climate/claypoole "1.1.4"]]}}
 
-  :plugins [[lein-marginalia "0.8.0"]
-            [lein-ancient "0.5.5"]]
+  :plugins [[lein-ancient "0.5.5"]]
 
   :deploy-repositories [["releases" :clojars]]
 
