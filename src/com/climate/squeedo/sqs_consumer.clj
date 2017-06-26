@@ -14,10 +14,9 @@
   "Functions for using Amazon Simple Queueing Service to request and perform
  computation."
   (:require
-    [clojure.core.async :refer [close! go-loop go >! <! <!! >!! chan buffer onto-chan]]
+    [clojure.core.async :refer [close! go-loop go >! <! chan buffer onto-chan]]
     [clojure.core.async.impl.protocols :refer [closed?]]
-    [com.climate.squeedo.sqs :as gsqs]
-    [clojure.tools.logging :as log]))
+    [com.climate.squeedo.sqs :as gsqs]))
 
 (defn- create-queue-listener
   " kick off a listener in the background that eagerly grabs messages as quickly
@@ -50,8 +49,7 @@
         (when-let [message (<! message-channel)]
           (try
             (compute message done-channel)
-            (catch Throwable t
-              (log/error t "Error thrown by compute, saving go block and nacking message")
+            (catch Throwable _
               (>! done-channel (assoc message :nack true))))
           (recur))))
 
