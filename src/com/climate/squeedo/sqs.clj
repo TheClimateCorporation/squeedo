@@ -84,11 +84,9 @@
                        "VisibilityTimeout"             auto-retry-seconds}
         ; Tip: don't try sending attrs as create-queue's 'options' param: they aren't the same
         queue-url (try
-                    (.getQueueUrl
-                      (.getQueueUrl client queue-name))
+                    (.getQueueUrl (.getQueueUrl client queue-name))
                     (catch QueueDoesNotExistException _
-                      (.getQueueUrl
-                        (.createQueue client queue-name))))
+                      (.getQueueUrl (.createQueue client queue-name))))
         attributes (->> (merge default-attrs
                                queue-attrs
                                (when dead-letter-url
