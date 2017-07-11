@@ -21,13 +21,13 @@
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/core.async "0.3.442"]
                  [cheshire "5.7.0"]
-                 [com.cemerick/bandalore "0.0.6"
-                  :exclusions [com.amazonaws/aws-java-sdk]]
                  [com.amazonaws/aws-java-sdk-sqs "1.11.98"]]
 
-  :profiles {:dev {:dependencies
-                   [[http-kit "2.2.0"]
-                    [com.climate/claypoole "1.1.4"]]}}
+  :profiles {:dev {:global-vars {*warn-on-reflection* true}
+                   :dependencies [[http-kit "2.2.0"]
+                                  [com.cemerick/bandalore "0.0.6"
+                                   :exclusions [com.amazonaws/aws-java-sdk]]
+                                  [com.climate/claypoole "1.1.4"]]}}
 
   :plugins [[lein-ancient "0.5.5"]]
 

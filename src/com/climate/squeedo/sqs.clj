@@ -12,11 +12,18 @@
 ;; and limitations under the License.
 (ns com.climate.squeedo.sqs
   (:require
-    [cemerick.bandalore :as sqs]
-    [cheshire.core :as json]
-    [clojure.tools.logging :as log])
-  (:import [com.amazonaws.services.sqs.model MessageAttributeValue SendMessageRequest ReceiveMessageRequest Message]
-           [com.amazonaws.services.sqs AmazonSQSClient]))
+    [clojure.tools.logging :as log]
+    [cheshire.core :as json])
+  (:import
+    (com.amazonaws.services.sqs.model
+      Message
+      MessageAttributeValue
+      QueueDoesNotExistException
+      ReceiveMessageRequest
+      SendMessageRequest)
+    (com.amazonaws.services.sqs
+      AmazonSQSClient
+      AmazonSQSClientBuilder)))
 
 (def ^:dynamic auto-retry-seconds
   "How long to wait before retrying a non-responding compute request."
@@ -55,30 +62,41 @@
 (defn- redrive-policy
   "Encode the RedrivePolicy for a dead letter queue.
   http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/SQSDeadLetterQueue.html"
-  [client dead-letter-queue-url]
-  {"RedrivePolicy"
-    (json/generate-string                                   ; yes, this is really necessary.
-      {"maxReceiveCount"     maximum-retries
-       "deadLetterTargetArn" ((sqs/queue-attrs client dead-letter-queue-url)
-                              "QueueArn")})})
+  [^AmazonSQSClient client ^String dead-letter-queue-url]
+  (let [queue-arn (-> client
+                      (.getQueueAttributes dead-letter-queue-url ["QueueArn"])
+                      (.getAttributes)
+                      (get "QueueArn"))]
+    {"RedrivePolicy"
+     ; yes, this is really necessary.
+     (json/generate-string {"maxReceiveCount"     maximum-retries
+                            "deadLetterTargetArn" queue-arn})}))
 
 (defn- get-queue
   "Retrieve the queue URL (Amazon Resource Name) from SQS.
 
   Optionally takes a dead letter queue URL (Amazon Resource Name),
   a queue that already exists, that gets associated with the returned queue."
-    [client queue-name queue-atts & [dead-letter-url]]
-  (let [default-attrs {"DelaySeconds"                  0    ; delay after enqueue
+  [^AmazonSQSClient client ^String queue-name queue-attrs & [dead-letter-url]]
+  (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
                        "MessageRetentionPeriod"        1209600 ; max, 14 days
                        "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
                        "VisibilityTimeout"             auto-retry-seconds}
         ; Tip: don't try sending attrs as create-queue's 'options' param: they aren't the same
-        q (sqs/create-queue client queue-name)]
-    (sqs/queue-attrs client q
-                     (merge default-attrs
-                            queue-atts
-                            (when dead-letter-url (redrive-policy client dead-letter-url))))
-    q))
+        queue-url (try
+                    (.getQueueUrl
+                      (.getQueueUrl client queue-name))
+                    (catch QueueDoesNotExistException _
+                      (.getQueueUrl
+                        (.createQueue client queue-name))))
+        attributes (->> (merge default-attrs
+                               queue-attrs
+                               (when dead-letter-url
+                                 (redrive-policy client dead-letter-url)))
+                        (map (fn [[k v]] [(str k) (str v)]))
+                        (into {}))]
+    (.setQueueAttributes client queue-url attributes)
+    queue-url))
 
 (defn mk-connection
   "Create an SQS connection to a queue identified by string queue-name. This
@@ -90,8 +108,7 @@
 
   Also, it optionally takes attribute maps for the main queue and the dead letter
   queue. These must be maps from string to string, with keys matching standard
-  SQS attribute names
-  "
+  SQS attribute names."
   [queue-name & {:keys [dead-letter
                         client
                         queue-attributes
@@ -99,7 +116,7 @@
   (validate-queue-name! queue-name)
   (when dead-letter
     (validate-queue-name! dead-letter))
-  (let [client (or client (sqs/create-client))
+  (let [client (or client (AmazonSQSClientBuilder/defaultClient))
         dead-letter-connection (when dead-letter
                                  (mk-connection dead-letter
                                                 :client client
@@ -116,7 +133,7 @@
        {:dead-letter (dissoc dead-letter-connection :client)}))))
 
 (defn- build-msg-attributes
-  "A simple helper function to turn a Clojure keyword map into a Map<String,MessageAttributeValue>"
+  "A helper function to turn a Clojure keyword map into a Map<String,MessageAttributeValue>"
   [message-attribute-map]
   (when message-attribute-map
     (into {}
@@ -137,10 +154,12 @@
      :body-md5 (.getMD5OfMessageBody resp)}))
 
 (defn enqueue
-  "Enqueues a message to a queue
-  Arguments:
+  "Enqueues a message to a queue.
+
+  Input:
   queue-connection - A connection to a queue made with mk-connection
   message - The message to be placed on the queue
+
   Optional arguments:
   :message-attributes - A map of SQS Attributes to apply to this message.
   :serialization-fn - A function that serializes the message you want to enqueue to a string
@@ -153,10 +172,15 @@
     (log/debugf "Enqueueing %s to %s" message queue-name)
     (send-message client queue-url (serialization-fn message) message-attributes)))
 
-(defn- clojurify-message-attributes [^Message msg]
+(defn- clojurify-message-attributes
+  [^Message msg]
   (let [javafied-message-attributes (.getMessageAttributes msg)]
     (->> javafied-message-attributes
-         (map (fn [[k ^MessageAttributeValue mav]] [(keyword k) (.getStringValue mav)]))
+         (map (fn [[k ^MessageAttributeValue mav]]
+                [(keyword k) (case (.getDataType mav)
+                               "String" (.getStringValue mav)
+                               "Number" (.getStringValue mav)
+                               "Binary" (.getBinaryValue mav))]))
          (into {}))))
 
 (defn- message-map
@@ -203,14 +227,14 @@
                                                ^java.util.Collection attributes
                                                ^java.util.Collection message-attribute-names]}]
   (let [req (-> (ReceiveMessageRequest. queue-url)
-              (.withMaxNumberOfMessages (-> limit (min 10) (max 1) int Integer/valueOf))
-              (.withAttributeNames attributes)
-              (.withMessageAttributeNames message-attribute-names))
+                (.withMaxNumberOfMessages (-> limit (min 10) (max 1) int Integer/valueOf))
+                (.withAttributeNames attributes)
+                (.withMessageAttributeNames message-attribute-names))
         req (if wait-time-seconds (.withWaitTimeSeconds req (Integer/valueOf (int wait-time-seconds))) req)
         req (if visibility (.withVisibilityTimeout req (Integer/valueOf (int visibility))) req)]
     (->> (.receiveMessage client req)
-      .getMessages
-      (map (partial message-map queue-url)))))
+         (.getMessages)
+         (map (partial message-map queue-url)))))
 
 ;; Raw message is being returned, so it's up to the user to determine the proper reader for their needs.
 ;; NaN,Infinity,-Infinity http://dev.clojure.org/jira/browse/CLJ-1074
@@ -230,36 +254,44 @@
   (log/debugf "Attempting dequeue from %s" queue-name)
   ;; will have a single queue/connection
   (try
-    (->>
-      (receive client
-               queue-url
-               :wait-time-seconds poll-timeout-seconds
-               :limit limit
-               :attributes attributes
-               :message-attribute-names message-attributes)
-      (map (fn [m]
-             (log/debugf "Dequeued from queue %s message %s" queue-name m)
-             (assoc m :queue-name queue-name))))
+    (->> (receive client
+                  queue-url
+                  :wait-time-seconds poll-timeout-seconds
+                  :limit limit
+                  :attributes attributes
+                  :message-attribute-names message-attributes)
+         (map (fn [m]
+                (log/debugf "Dequeued from queue %s message %s" queue-name m)
+                (assoc m :queue-name queue-name))))
     (catch Exception e
       (log/error e "Encountered exception dequeueing.")
       [])))
 
 (defn ack
-  "Remove the message from the queue."
-  [{:keys [client]} message]
-  (log/debugf "Acking message %s" message)
-  (sqs/delete client message))
+  "Remove the message from the queue.
+
+  Input:
+    connection - as created by mk-connection
+    message - the message to ack"
+  [{:keys [^AmazonSQSClient client
+           ^String queue-url]}
+   {:keys [^String receipt-handle]}]
+  (log/debugf "Acking message %s" receipt-handle)
+  (.deleteMessage client queue-url receipt-handle))
 
 (defn nack
   "Put the message back on the queue.
-   input:
-     connection - as created by mk-connection
-     message - the message to nack
-     nack-visibility-seconds (optional) - How long to wait before retrying a failed compute request.
-                                          Defaults to 0."
+
+  Input:
+    connection - as created by mk-connection
+    message - the message to nack
+    nack-visibility-seconds (optional) - How long to wait before retrying a failed compute request.
+                                         Defaults to 0."
   ([connection message]
    (nack connection message 0))
-  ([{:keys [client queue-url]} message nack-visibility-seconds]
-   (log/debugf "Nacking message %s" message)
-   (sqs/change-message-visibility client queue-url message
-                                  (int nack-visibility-seconds))))
+  ([{:keys [^AmazonSQSClient client
+            ^String queue-url]}
+    {:keys [^String receipt-handle]}
+    nack-visibility-seconds]
+   (log/debugf "Nacking message %s" receipt-handle)
+   (.changeMessageVisibility client queue-url receipt-handle (int nack-visibility-seconds))))
