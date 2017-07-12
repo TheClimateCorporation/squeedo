@@ -77,24 +77,26 @@
 
   Optionally takes a dead letter queue URL (Amazon Resource Name),
   a queue that already exists, that gets associated with the returned queue."
-  [^AmazonSQSClient client ^String queue-name queue-attrs & [dead-letter-url]]
-  (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
-                       "MessageRetentionPeriod"        1209600 ; max, 14 days
-                       "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
-                       "VisibilityTimeout"             auto-retry-seconds}
-        ; Tip: don't try sending attrs as create-queue's 'options' param: they aren't the same
-        queue-url (try
-                    (.getQueueUrl (.getQueueUrl client queue-name))
-                    (catch QueueDoesNotExistException _
-                      (.getQueueUrl (.createQueue client queue-name))))
-        attributes (->> (merge default-attrs
-                               queue-attrs
-                               (when dead-letter-url
-                                 (redrive-policy client dead-letter-url)))
-                        (map (fn [[k v]] [(str k) (str v)]))
-                        (into {}))]
-    (.setQueueAttributes client queue-url attributes)
-    queue-url))
+  ([client queue-name queue-attrs]
+   (get-queue client queue-name queue-attrs nil))
+  ([^AmazonSQSClient client ^String queue-name queue-attrs dead-letter-url]
+   (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
+                        "MessageRetentionPeriod"        1209600 ; max, 14 days
+                        "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
+                        "VisibilityTimeout"             auto-retry-seconds}
+         queue-url (try
+                     (.getQueueUrl (.getQueueUrl client queue-name))
+                     (catch QueueDoesNotExistException _
+                       (.getQueueUrl (.createQueue client queue-name))))
+         redrive-attrs (when dead-letter-url
+                         (redrive-policy client dead-letter-url))]
+     (->> (merge default-attrs
+                 queue-attrs
+                 redrive-attrs)
+          (map (fn [[k v]] [(str k) (str v)]))
+          (into {})
+          (.setQueueAttributes client queue-url))
+     queue-url)))
 
 (defn mk-connection
   "Create an SQS connection to a queue identified by string queue-name. This

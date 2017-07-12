@@ -141,7 +141,7 @@
        :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
                         times will go (will be created if necessary).
                         Defaults to (str queue-name \"-failed\")
-       :client        : the bandalore sqs client to use (if missing, sqs/mk-connection will create
+       :client        : the sqs client to use (if missing, sqs/mk-connection will create
                         the client)
    Output:
     a map with keys, :done-channel - the channel to send messages to be acked
