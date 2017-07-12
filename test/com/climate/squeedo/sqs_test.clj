@@ -50,14 +50,14 @@
         (is (= "1" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
         (is (= "2" (get (band/queue-attrs client (:queue-url dead-letter)) "VisibilityTimeout")))))
 
-    (testing "pre-existing queue, changing attributes"
+    (testing "pre-existing queue, does not change attributes"
       (let [{:keys [client queue-url dead-letter]}
             (sqs/mk-connection queue
                                :dead-letter dl-queue
                                :queue-attributes {"VisibilityTimeout" "3"}
                                :dead-letter-queue-attributes {"VisibilityTimeout" "4"})]
-        (is (= "3" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
-        (is (= "4" (get (band/queue-attrs client (:queue-url dead-letter)) "VisibilityTimeout")))))))
+        (is (= "1" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
+        (is (= "2" (get (band/queue-attrs client (:queue-url dead-letter)) "VisibilityTimeout")))))))
 
 (deftest ^:integration test-multiple-formats
   (with-temporary-queue
