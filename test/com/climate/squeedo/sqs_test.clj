@@ -59,6 +59,52 @@
         (is (= "1" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
         (is (= "2" (get (band/queue-attrs client (:queue-url dead-letter)) "VisibilityTimeout")))))))
 
+(deftest ^:integration test-set-queue-attributes
+  (with-temporary-queue
+    [queue]
+    (testing "set attributes on queue"
+      (let [{:keys [client queue-url] :as conn}
+            (sqs/mk-connection queue
+                               :queue-attributes {"VisibilityTimeout" "9"})]
+        (is (= "9" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
+
+        (sqs/set-queue-attributes conn :queue-attributes {"VisibilityTimeout" "10"})
+        (is (= "10" (get (band/queue-attrs client queue-url) "VisibilityTimeout"))))))
+
+  (with-temporary-queue
+    [queue dl-queue]
+    (testing "set attributes on queue and dead-letter queue"
+      (let [{:keys [client queue-url] :as conn}
+            (sqs/mk-connection queue
+                               :dead-letter dl-queue
+                               :queue-attributes {"VisibilityTimeout" "42"}
+                               :dead-letter-queue-attributes {"VisibilityTimeout" "43"})]
+        (is (= "42" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
+        (is (= "43" (get (band/queue-attrs client dl-queue) "VisibilityTimeout")))
+        (sqs/set-queue-attributes conn
+                                  :queue-attributes {"VisibilityTimeout" "44"}
+                                  :dead-letter-queue-attributes {"VisibilityTimeout" "45"})
+        (is (= "44" (get (band/queue-attrs client queue-url) "VisibilityTimeout")))
+        (is (= "45" (get (band/queue-attrs client dl-queue) "VisibilityTimeout"))))))
+
+  (with-temporary-queue
+    [queue dl-queue]
+    (testing "set attributes on queue and dead-letter queue adds a redrive policy
+             if it did not exist"
+      (let [;; create each queue separately
+            _ (sqs/mk-connection dl-queue)
+            _ (sqs/mk-connection queue)
+
+            ;; establish a connection with dl-queue where both queues exist prior
+            {:keys [client queue-url] :as conn}
+            (sqs/mk-connection queue :dead-letter dl-queue)]
+        (is (nil? (get (band/queue-attrs client queue) "RedrivePolicy")))
+        (sqs/set-queue-attributes conn)
+        (is (= {"maxReceiveCount"     3
+                "deadLetterTargetArn" (get (band/queue-attrs client dl-queue) "QueueArn")}
+               (json/decode
+                 (get (band/queue-attrs client queue) "RedrivePolicy"))))))))
+
 (deftest ^:integration test-multiple-formats
   (with-temporary-queue
     [queue-name]

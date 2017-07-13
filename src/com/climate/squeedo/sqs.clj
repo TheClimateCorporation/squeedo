@@ -86,19 +86,21 @@
 
   Optionally takes a dead letter queue URL (Amazon Resource Name),
   a queue that already exists, that gets associated with the returned queue."
-  [^AmazonSQSClient client ^String queue-url queue-attrs dead-letter-url]
-  (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
-                       "MessageRetentionPeriod"        1209600 ; max, 14 days
-                       "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
-                       "VisibilityTimeout"             auto-retry-seconds}
-        redrive-attrs (when dead-letter-url
-                        (redrive-policy client dead-letter-url))]
-    (->> (merge default-attrs
-                queue-attrs
-                redrive-attrs)
-         (map (fn [[k v]] [(str k) (str v)]))
-         (into {})
-         (.setQueueAttributes client queue-url))))
+  ([client queue-url queue-attrs]
+   (set-attributes client queue-url queue-attrs nil))
+  ([^AmazonSQSClient client ^String queue-url queue-attrs dead-letter-url]
+   (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
+                        "MessageRetentionPeriod"        1209600 ; max, 14 days
+                        "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
+                        "VisibilityTimeout"             auto-retry-seconds}
+         redrive-attrs (when dead-letter-url
+                         (redrive-policy client dead-letter-url))]
+     (->> (merge default-attrs
+                 queue-attrs
+                 redrive-attrs)
+          (map (fn [[k v]] [(str k) (str v)]))
+          (into {})
+          (.setQueueAttributes client queue-url)))))
 
 (defn- get-or-create-queue
   "Get or create an SQS queue with the given name and specified queue attributes.
