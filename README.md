@@ -7,26 +7,28 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 
 ## Latest version
 
-[![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg )](http://clojars.org/com.climate/squeedo )
+[![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg)](http://clojars.org/com.climate/squeedo)
 [![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
+
+See [CHANGELOG](https://github.com/TheClimateCorporation/squeedo/blob/master/CHANGELOG.md) for release notes.
 
 ## Inspiration
 
 Squeedo's inspiration came from our continual need to quickly process lots of messages from SQS. We found that the
 code to support these processes was quite similar in that it often involved a lot of plumbing of listening to SQS,
-pulling messages,  processing them with some kind of threadpool and then acking them back.  The goal was to make this
+pulling messages, processing them with some kind of threadpool and then acking them back. The goal was to make this
 easier by somehow simply passing a compute function that would handle all of the plumbing and allow us to focus on
 the compute logic of what to do with the message.
 
 After several iterations of basing this plumbing code on threadpools, we quickly found that we couldn't get the kind of
-throughput we wanted simply by tuning only the number of threads.  We needed something more dynamic, that would adapt
+throughput we wanted simply by tuning only the number of threads. We needed something more dynamic, that would adapt
 better to the number of cores it ran on and would squeeze every last bit of CPU from our EC2 instances. After reading
 this blog post http://martintrojer.github.io/clojure/2013/07/07/coreasync-and-blocking-io we were inspired to use
 core.async and Squeedo was born.
 
 ## Why use Squeedo?
 
-Where Squeedo shines is in its ability to push CPU utilization to the max without managing a threadpool.  It is
+Where Squeedo shines is in its ability to push CPU utilization to the max without managing a threadpool. It is
 especially good when combined with an non-blocking I/O web client library like http-kit as mentioned in the blog above.
 
 ## Simple quick start
@@ -50,7 +52,7 @@ In its simplest form, Squeedo is composed of only 2 parts, a compute function an
 (stop-consumer consumer)
 ```
 
-The compute function must post to the done-channel even for exceptions.  This will ack/nack each message.  Squeedo
+The compute function must post to the done-channel even for exceptions. This will ack/nack each message. Squeedo
 listens to the done-channel to know when work is complete so it can pass your compute function another message to
 process.
 
@@ -143,18 +145,19 @@ your workflow beyond what the very reasonable defaults do out of the box.
 * **:num-listeners** - the number of listeners polling from SQS. default is (num-workers /dequeue-limit) since each listener dequeues up to dequeue-limit messages at a time. If you have a really fast process, you can actually starve the compute function of messages and thus need more listeners pulling from SQS.
 * **:dequeue-limit** - the number of messages to dequeue at a time; default 10
 * **:max-concurrent-work** - the maximum number of total messages processed concurrently. This is mainly for async workflows where you can have work started and are waiting for parked IO threads to complete; default num-workers. This allows you to always keep the CPU's busy by having data returned by IO ready to be processed. Its really a memory game at this point -- how much data you can buffer that's ready to be processed by your asynchronous http clients.
-* **:dl-queue-name** - the dead letter SQS queue to which repeatedly failed messages will go.  A message that fails to process the maximum number of SQS receives is sent to the dead letter queue. (see SQS Redrive Policy)  The queue will be created if necessary.  Defaults to (str QUEUE-NAME \”-failed\”) where QUEUE-NAME is the name of the queue passed into the start-consumer function.
+* **:dl-queue-name** - the dead letter SQS queue to which repeatedly failed messages will go. A message that fails to process the maximum number of SQS receives is sent to the dead letter queue. (see SQS Redrive Policy) The queue will be created if necessary. Defaults to (str QUEUE-NAME \”-failed\”) where QUEUE-NAME is the name of the queue passed into the start-consumer function.
 * **:client** - the SQS client used to start the consumer. By default an SQS client is created internally using instance credentials, but a client can be passed in to be used. This allows you to use a client you may have already created with some specific properties (e.g. manually overridden AWS credentials).
 
 ## Additional goodies
 
-Checkout the `com.climate.squeedo.sqs` namespace for extra goodies like connecting to queues, enqueuing and dequeing
-messages, and acking and nacking.  Mostly addons to https://github.com/cemerick/bandalore
+Checkout the `com.climate.squeedo.sqs` namespace for extra goodies like connecting to queues, enqueuing and dequeuing
+messages, and acking and nacking.
 
 ## Acknowledgments
 
-Shoutouts to [Jeff Melching](https://github.com/jmelching), [Tim Chagnon](https://github.com/tchagnon), and
+* Shoutouts to [Jeff Melching](https://github.com/jmelching), [Tim Chagnon](https://github.com/tchagnon), and
 [Robert Grailer](https://github.com/RobertGrailer) for being major contributors to this project.
+* Bandalore, which Squeedo originally leveraged as its internal SQS client (https://github.com/cemerick/bandalore).
 
 ## License
 

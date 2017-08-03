@@ -10,7 +10,7 @@
 ;; "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 ;; or implied.  See the License for the specific language governing permissions
 ;; and limitations under the License.
-(defproject com.climate/squeedo "0.2.2-SNAPSHOT"
+(defproject com.climate/squeedo "0.3.0-SNAPSHOT"
   :description "Squeedo: The sexiest message consumer ever (™)"
   :url "http://github.com/TheClimateCorporation/squeedo/"
   :min-lein-version "2.0.0"
@@ -21,13 +21,13 @@
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/core.async "0.3.442"]
                  [cheshire "5.7.0"]
-                 [com.cemerick/bandalore "0.0.6"
-                  :exclusions [com.amazonaws/aws-java-sdk]]
                  [com.amazonaws/aws-java-sdk-sqs "1.11.98"]]
 
-  :profiles {:dev {:dependencies
-                   [[http-kit "2.2.0"]
-                    [com.climate/claypoole "1.1.4"]]}}
+  :profiles {:dev {:global-vars {*warn-on-reflection* true}
+                   :dependencies [[http-kit "2.2.0"]
+                                  [com.cemerick/bandalore "0.0.6"
+                                   :exclusions [com.amazonaws/aws-java-sdk]]
+                                  [com.climate/claypoole "1.1.4"]]}}
 
   :plugins [[lein-ancient "0.5.5"]]
 

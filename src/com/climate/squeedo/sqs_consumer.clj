@@ -12,24 +12,23 @@
 ;; and limitations under the License.
 (ns com.climate.squeedo.sqs-consumer
   "Functions for using Amazon Simple Queueing Service to request and perform
- computation."
+  computation."
   (:require
     [clojure.core.async :refer [close! go-loop go >! <! chan buffer onto-chan]]
     [clojure.core.async.impl.protocols :refer [closed?]]
-    [com.climate.squeedo.sqs :as gsqs]))
+    [com.climate.squeedo.sqs :as sqs]))
 
 (defn- create-queue-listener
-  " kick off a listener in the background that eagerly grabs messages as quickly
-    as possible and fetches them into a buffered channel.  This will park the thread
-    if the message channel is full. (ie. don't prefetch too many messages as there is a memory
-    impact, and they have to get processed before timing out.)
-  "
+  "Kick off a listener in the background that eagerly grabs messages as quickly
+  as possible and fetches them into a buffered channel.  This will park the thread
+  if the message channel is full. (ie. don't prefetch too many messages as there is a memory
+  impact, and they have to get processed before timing out.)"
   [connection num-listeners buffer-size dequeue-limit]
   (let [buf (buffer buffer-size)
         message-channel (chan buf)]
     (dotimes [_ num-listeners]
       (go (while
-            (let [messages (gsqs/dequeue connection :limit dequeue-limit)]
+            (let [messages (sqs/dequeue connection :limit dequeue-limit)]
               ; block until all messages are put onto message-channel
               (<! (onto-chan message-channel messages false))
               (not (closed? message-channel))))))
@@ -37,7 +36,7 @@
 
 (defn- create-workers
   "Create workers to run the compute function. Workers are expected to be CPU bound or handle all IO in an asynchronous
-  manner.  In the future we may add an option to run computes in a thread/pool that isn't part of the core.async's
+  manner. In the future we may add an option to run computes in a thread/pool that isn't part of the core.async's
   threadpool."
   [connection worker-size max-concurrent-work message-channel compute]
   (let [done-channel (chan worker-size)
@@ -61,9 +60,9 @@
           ; (n)ack the message asynchronously
           (let [nack (:nack message)]
             (cond
-              (integer? nack) (go (gsqs/nack connection message (:nack message)))
-              nack            (go (gsqs/nack connection message))
-              :else           (go (gsqs/ack connection message))))
+              (integer? nack) (go (sqs/nack connection message (:nack message)))
+              nack            (go (sqs/nack connection message))
+              :else           (go (sqs/ack connection message))))
           (recur))))
     done-channel))
 
@@ -126,7 +125,7 @@
 
    This code is atom free :)
 
-   inputs:
+   Input:
     queue-name - the name of an sqs queue (will be created if necessary)
 
     compute - a compute function that takes two args: a 'message' containing the body of the sqs
@@ -142,18 +141,17 @@
        :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
                         times will go (will be created if necessary).
                         Defaults to (str queue-name \"-failed\")
-       :client        : the bandalore sqs client to use (if missing, sqs/mk-connection will create
+       :client        : the sqs client to use (if missing, sqs/mk-connection will create
                         the client)
-   outputs:
+   Output:
     a map with keys, :done-channel - the channel to send messages to be acked
-                     :message-channel - unused by the client.
-  "
+                     :message-channel - unused by the client."
   [queue-name compute & opts]
   (let [options (->options-map opts)
         dead-letter-queue-name (get-dead-letter-queue-name queue-name options)
-        connection (gsqs/mk-connection queue-name
-                                       :dead-letter dead-letter-queue-name
-                                       :client      (:client options))
+        connection (sqs/mk-connection queue-name
+                                      :dead-letter dead-letter-queue-name
+                                      :client      (:client options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
         message-channel-size (get-message-channel-size listener-count options)

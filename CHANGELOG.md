@@ -1,3 +1,15 @@
+## 0.3.0-SNAPSHOT (unreleased)
+
+* **BREAKING**
+  * queue attributes are only set when `com.climate.squeedo.sqs/mk-connection` creates a new sqs queue
+    * if an existing queue is found, queue attributes are not applied (this includes dead-letter/redrive configuration)
+    * squeedo will emit a `WARN` log when this occurs
+    * allows reading from queues that already exist for consumers without create permissions (#34)
+    * new api function, `com.climate.squeedo.sqs/set-queue-attributes`, which allows ad-hoc calls to set attributes
+    for those who need it
+  * support binary message attributes (#30)
+  * remove bandalore as a source dependency
+
 ## 0.2.1 (June 26, 2017)
 
 * consumer middleware for deserialization and exception logging
