@@ -1,4 +1,4 @@
-## 0.3.0-SNAPSHOT (unreleased)
+## 1.0.0-SNAPSHOT (unreleased)
 
 * support binary message attributes (#30)
 * remove bandalore as a source dependency
