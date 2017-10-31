@@ -105,9 +105,7 @@
       (log/debugf "SQS queue %s does not exist. Creating queue." queue-name)
       (.getQueueUrl (.createQueue client queue-name)))))
 
-(defn- default-client
-  []
-  (AmazonSQSClientBuilder/defaultClient))
+(defn- default-client [] (AmazonSQSClientBuilder/defaultClient))
 
 (defn configure-queue
   "Update an SQS queue with the provided configuration. This should be done
@@ -144,13 +142,22 @@
     (set-attributes client queue-url queue-attributes dead-letter-url)
     queue-url))
 
+(defn- dead-letter-deprecation-warning
+  [options]
+  (when (:dead-letter options)
+    (println
+      (str "WARNING - :dead-letter option for com.climate.squeedo.sqs/mk-connection has"
+           " been removed. Please use com.climate.squeedo.sqs/configure to configure an"
+           " SQS dead letter queue."))))
+
 (defn mk-connection
   "Make an SQS connection to a queue identified by string queue-name. This
   should be done once at startup time.
 
   Will throw QueueDoesNotExistException if the queue does not exist.
   `configure-queue` can be used to create and configure the queue."
-  [^String queue-name & {:keys [client]}]
+  [^String queue-name & {:keys [client] :as options}]
+  (dead-letter-deprecation-warning options)
   (validate-queue-name! queue-name)
   (let [^AmazonSQSClient client (or client (default-client))
         queue-url (.getQueueUrl (.getQueueUrl client queue-name))]

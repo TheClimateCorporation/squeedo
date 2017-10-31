@@ -105,6 +105,14 @@
   (or (:dequeue-limit options)
       10))
 
+(defn- dead-letter-deprecation-warning
+  [options]
+  (when (:dl-queue-name options)
+    (println
+      (str "WARNING - :dl-queue-name option for com.climate.squeedo.sqs-consumer/start-consumer"
+           " has been removed. Please use com.climate.squeedo.sqs/configure to configure an SQS"
+           " dead letter queue."))))
+
 (defn start-consumer
   "Creates a consumer that reads messages as quickly as possible into a local buffer up
    to the configured buffer size.
@@ -140,6 +148,7 @@
                      :message-channel - unused by the client."
   [queue-name compute & opts]
   (let [options (->options-map opts)
+        _ (dead-letter-deprecation-warning options)
         connection (sqs/mk-connection queue-name :client (:client options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
