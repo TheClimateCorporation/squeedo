@@ -1,28 +1,31 @@
 (ns com.climate.squeedo.test-utils
-  (:require [clojure.tools.logging :as log]
-            [cemerick.bandalore :as bandalore]))
+  (:require
+    [clojure.tools.logging :as log]
+    [cemerick.bandalore :as bandalore]))
 
-(defmacro with-temporary-queue
-  [[queue-name & [dead-letter-queue-name]] & body]
-  (let [dead-letter-queue-name (or dead-letter-queue-name
-                                   (gensym "dead-letter-queue-name"))]
-    `(let [r# (rand-int Integer/MAX_VALUE)
-           ~queue-name (format "test_squeedo_%s" r#)
-           ~dead-letter-queue-name (format "test_squeedo_dead-letter_%s" r#)]
-       (log/infof "Using testing queue %s" ~queue-name)
-       (when ~dead-letter-queue-name
-         (log/infof "Using testing dead-letter queue %s" ~dead-letter-queue-name))
-       (try
-         ~@body
-         (finally
-           ;; Definitely clean up after ourselves!
-           (let [client# (bandalore/create-client)
-                 queue-url# (bandalore/create-queue client# ~queue-name)]
-             (bandalore/delete-queue client# queue-url#)
-             (log/infof "Deleted testing queue %s" ~queue-name)
-             (when ~dead-letter-queue-name
-               (let [dlq-url# (bandalore/create-queue client#
-                                                      ~dead-letter-queue-name)]
-                 (bandalore/delete-queue client# dlq-url#))
-               (log/infof "Deleted testing dead letter queue %s"
-                          ~dead-letter-queue-name))))))))
+(defn initialize-queue
+  [queue-sym]
+  (let [queue-name (format "test_squeedo_%s_%s"
+                           (System/currentTimeMillis)
+                           (rand-int Integer/MAX_VALUE))]
+    (log/infof "Using testing queue %s for %s" queue-name queue-sym)
+    queue-name))
+
+(defn destroy-queue
+  [client queue-name]
+  (try
+    (let [url (bandalore/create-queue client queue-name)]
+      (bandalore/delete-queue client url)
+      (log/infof "Deleted testing queue %s" queue-name))
+    (catch Exception e
+      (log/warnf e "Failed to delete testing queue %s" queue-name))))
+
+(defmacro with-temporary-queues
+  [queue-syms & body]
+  `(let ~(->> (map (fn [q] `(initialize-queue (quote ~q))) queue-syms)
+              (map vector queue-syms)
+              (apply concat)
+              (vec))
+     ~@body
+     (let [client# (bandalore/create-client)]
+       (dorun (map (partial destroy-queue client#) ~queue-syms)))))
