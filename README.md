@@ -10,6 +10,9 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 [![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg)](http://clojars.org/com.climate/squeedo)
 [![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
 
+## Changes
+
+Version `1.0.0` features breaking changes to queue connection and configuration.
 See [CHANGELOG](https://github.com/TheClimateCorporation/squeedo/blob/master/CHANGELOG.md) for release notes.
 
 ## Inspiration
