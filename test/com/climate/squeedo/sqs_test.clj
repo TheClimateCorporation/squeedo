@@ -31,7 +31,9 @@
             "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name"))))
   (testing "Empty queue name"
     (is (thrown? IllegalArgumentException
-          (sqs/validate-queue-name! "")))))
+          (sqs/validate-queue-name! ""))))
+  (testing "Queue with .fifo suffix"
+    (is (nil? (sqs/validate-queue-name! "hello-world.fifo")))))
 
 (defn dequeue-1
   "Convenience function for some of these tests"
