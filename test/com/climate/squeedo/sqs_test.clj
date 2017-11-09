@@ -28,7 +28,10 @@
   (testing "Queue name length check"
     (is (thrown? IllegalArgumentException
           (sqs/validate-queue-name!
-            "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name"))))
+            "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name")))
+    (is (nil? (sqs/validate-queue-name! 
+                (str "0123456789" "0123456789" "0123456789" "0123456789"
+                     "0123456789" "0123456789" "0123456789" "0123456789")))))
   (testing "Empty queue name"
     (is (thrown? IllegalArgumentException
           (sqs/validate-queue-name! ""))))
