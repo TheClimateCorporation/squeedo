@@ -29,9 +29,11 @@
     (is (thrown? IllegalArgumentException
           (sqs/validate-queue-name!
             "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name")))
-    (is (nil? (sqs/validate-queue-name! 
-                (str "0123456789" "0123456789" "0123456789" "0123456789"
-                     "0123456789" "0123456789" "0123456789" "0123456789")))))
+    (let [eighty-char-str (->> (repeat "L")
+                               (take 80)
+                               (reduce str))]
+          (is (nil? (sqs/validate-queue-name!
+                      eighty-char-str)))))
   (testing "Empty queue name"
     (is (thrown? IllegalArgumentException
           (sqs/validate-queue-name! ""))))
