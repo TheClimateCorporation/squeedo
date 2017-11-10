@@ -17,6 +17,10 @@
     * removed the default behavior of creating a dead letter queue when starting a
       consumer.
 
+## 0.2.2 (November 9, 2017)
+
+* support and validate fifo queue names (thanks @lainiewright!)
+
 ## 0.2.1 (June 26, 2017)
 
 * consumer middleware for deserialization and exception logging

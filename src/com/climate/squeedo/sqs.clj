@@ -45,15 +45,15 @@
 
 (def ^:const invalid-queue-message
   (str "Queue names can only include alphanumeric characters "
-       "hyphens, or underscores. Queue name should be less than "
+       "hyphens, or underscores. A FIFO queue must have the"
+       ".fifo suffix. Queue name should be no more than "
        "80 characters."))
 
 (defn valid-queue-name?
   "Returns true if an SQS queue name is valid, false otherwise"
   [queue-name]
-  (not (or (empty? queue-name)
-           (re-find #"[^A-Za-z0-9_-]" queue-name)
-           (>= (count queue-name) 80))))
+  (and (re-matches #"[A-Za-z0-9_-]+(\.fifo)?" queue-name)
+       (<= (count queue-name) 80)))
 
 (defn validate-queue-name!
   "Validates input for SQS queue names.
