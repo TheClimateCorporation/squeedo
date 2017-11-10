@@ -28,10 +28,17 @@
   (testing "Queue name length check"
     (is (thrown? IllegalArgumentException
           (sqs/validate-queue-name!
-            "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name"))))
+            "areally-really-really-really-really-really-really-really-looooooooooooooooonnnnnnggg-queue-name")))
+    (let [eighty-char-str (->> (repeat "L")
+                               (take 80)
+                               (reduce str))]
+          (is (nil? (sqs/validate-queue-name!
+                      eighty-char-str)))))
   (testing "Empty queue name"
     (is (thrown? IllegalArgumentException
-          (sqs/validate-queue-name! "")))))
+          (sqs/validate-queue-name! ""))))
+  (testing "Queue with .fifo suffix"
+    (is (nil? (sqs/validate-queue-name! "hello-world.fifo")))))
 
 (defn dequeue-1
   "Convenience function for some of these tests"
