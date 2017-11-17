@@ -11,3 +11,5 @@ pom.xml.asc
 *.iml
 .project
 .classpath
+*.sw*
+.DS_Store

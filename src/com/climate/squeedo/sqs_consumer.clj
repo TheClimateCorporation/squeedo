@@ -80,10 +80,17 @@
   []
   (.availableProcessors (Runtime/getRuntime)))
 
+(defn- default-dead-letter-queue-name
+  [queue-name]
+  (let [parsed (sqs/parse-queue-name queue-name)]
+    (cond-> (:name parsed)
+      true            (str "-failed")
+      (:fifo? parsed) (str ".fifo"))))
+
 (defn- get-dead-letter-queue-name
   [queue-name options]
   (or (:dl-queue-name options)
-      (str queue-name "-failed")))
+      (default-dead-letter-queue-name queue-name)))
 
 (defn- get-worker-count
   [options]

@@ -16,6 +16,7 @@
     [cheshire.core :as json])
   (:import
     (com.amazonaws.services.sqs.model
+      CreateQueueRequest
       Message
       MessageAttributeValue
       QueueDoesNotExistException
@@ -41,14 +42,21 @@
 
 (def ^:const invalid-queue-message
   (str "Queue names can only include alphanumeric characters "
-       "hyphens, or underscores. A FIFO queue must have the"
+       "hyphens, or underscores. A FIFO queue must have the "
        ".fifo suffix. Queue name should be no more than "
        "80 characters."))
+
+(defn parse-queue-name 
+  [queue-name]
+  (let [[_ queue-name fifo?] (re-matches #"([A-Za-z0-9_-]+)(\.fifo)?" queue-name)]
+    (when queue-name
+      {:name queue-name
+       :fifo? (boolean fifo?)})))
 
 (defn valid-queue-name?
   "Returns true if an SQS queue name is valid, false otherwise"
   [queue-name]
-  (and (re-matches #"[A-Za-z0-9_-]+(\.fifo)?" queue-name)
+  (and (some? (parse-queue-name queue-name))
        (<= (count queue-name) 80)))
 
 (defn validate-queue-name!
@@ -111,7 +119,11 @@
   (if-let [queue-url (get-queue client queue-name)]
     (do (log/warnf "Found existing queue %s, queue attributes and redrive policy will not be modified." queue-name)
         queue-url)
-    (let [queue-url (.getQueueUrl (.createQueue client queue-name))]
+    (let [fifo? (:fifo? (parse-queue-name queue-name))
+          create-queue-request (cond-> (CreateQueueRequest.)
+                                   true  (.withQueueName queue-name)
+                                   fifo? (.withAttributes {"FifoQueue" "true"}))
+          queue-url (.getQueueUrl (.createQueue client create-queue-request))]
       (log/debugf "Created SQS queue %s" queue-name)
       (set-attributes client queue-url queue-attrs dead-letter-url)
       queue-url)))
