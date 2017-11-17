@@ -164,6 +164,16 @@
                   sqs-server/create-queue-listener (fn [_ _ _ _] [1])
                   sqs-server/create-workers (fn [_ _ _ _ _] nil)]
       (sqs-server/start-consumer "q" stub-compute-fn)))
+  (testing "dl-queue-name defaults to correct name for a fifo queue"
+    (with-redefs [sqs/mk-connection (fn [q-name _ dl-queue-name _ _]
+                                      (is (= "q-failed.fifo" dl-queue-name))
+                                      (is (= "q.fifo" q-name))
+                                      {:client "client"
+                                       :queue-name q-name
+                                       :queue-url "http://"})
+                  sqs-server/create-queue-listener (fn [_ _ _ _] [1])
+                  sqs-server/create-workers (fn [_ _ _ _ _] nil)]
+      (sqs-server/start-consumer "q.fifo" stub-compute-fn)))
   (testing "options can be configured via map"
     (let [queue-name "qq"
           dead-letter-queue-name "dead letter queue"
