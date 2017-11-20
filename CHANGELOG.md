@@ -22,7 +22,7 @@
 
 ## 0.2.2 (November 9, 2017)
 
-* support and validate fifo queue names (thanks @lainiewright!)
+* support and validate FIFO queue names (thanks @lainiewright!)
 * **BREAKING**
   * queue attributes are only set when `com.climate.squeedo.sqs/mk-connection` creates a new sqs queue
     * if an existing queue is found, queue attributes are not applied (this includes dead-letter/redrive configuration)
