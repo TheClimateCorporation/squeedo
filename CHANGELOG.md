@@ -1,5 +1,11 @@
-## 0.3.0-SNAPSHOT (unreleased)
+## 0.2.3 (November 20, 2017)
 
+* fix default dead letter queue in SQS consumer when queue is a FIFO queue
+* support creating a FIFO queue when connecting to one that does not exist
+
+## 0.2.2 (November 9, 2017)
+
+* support and validate fifo queue names (thanks @lainiewright!)
 * **BREAKING**
   * queue attributes are only set when `com.climate.squeedo.sqs/mk-connection` creates a new sqs queue
     * if an existing queue is found, queue attributes are not applied (this includes dead-letter/redrive configuration)
@@ -9,15 +15,6 @@
     for those who need it
   * support binary message attributes (#30)
   * remove bandalore as a source dependency
-
-## 0.2.3 (November 20, 2017)
-
-* fix default dead letter queue in SQS consumer when queue is a FIFO queue
-* support creating a FIFO queue when connecting to one that does not exist
-
-## 0.2.2 (November 9, 2017)
-
-* support and validate fifo queue names (thanks @lainiewright!)
 
 ## 0.2.1 (June 26, 2017)
 
