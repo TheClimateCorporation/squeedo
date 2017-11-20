@@ -1,4 +1,4 @@
-## 1.0.0-beta1 (unreleased)
+## 1.0.0-beta1 (November 20, 2017)
 
 * **BREAKING**
   * queue attributes are only set via `com.climate.squeedo.sqs/configure-queue`
