@@ -80,18 +80,6 @@
   []
   (.availableProcessors (Runtime/getRuntime)))
 
-(defn- default-dead-letter-queue-name
-  [queue-name]
-  (let [parsed (sqs/parse-queue-name queue-name)]
-    (cond-> (:name parsed)
-      true            (str "-failed")
-      (:fifo? parsed) (str ".fifo"))))
-
-(defn- get-dead-letter-queue-name
-  [queue-name options]
-  (or (:dl-queue-name options)
-      (default-dead-letter-queue-name queue-name)))
-
 (defn- get-worker-count
   [options]
   (or (:num-workers options)
@@ -117,6 +105,14 @@
   (or (:dequeue-limit options)
       10))
 
+(defn- dead-letter-deprecation-warning
+  [options]
+  (when (:dl-queue-name options)
+    (println
+      (str "WARNING - :dl-queue-name option for com.climate.squeedo.sqs-consumer/start-consumer"
+           " has been removed. Please use com.climate.squeedo.sqs/configure to configure an SQS"
+           " dead letter queue."))))
+
 (defn start-consumer
   "Creates a consumer that reads messages as quickly as possible into a local buffer up
    to the configured buffer size.
@@ -133,32 +129,27 @@
    This code is atom free :)
 
    Input:
-    queue-name - the name of an sqs queue (will be created if necessary)
-
+    queue-name - the name of an sqs queue
     compute - a compute function that takes two args: a 'message' containing the body of the sqs
               message and a channel on which to ack/nack when done.
-    opts -
-       :message-channel-size : the number of messages to prefetch from sqs; default 20 * num-listeners
-       :num-workers : the number of workers processing messages concurrently
-       :num-listeners : the number of listeners polling from sqs. default is (num-workers / 10)
-                        since each listener dequeues up to 10 messages at a time
-       :dequeue-limit : the number of messages to dequeue at a time; default 10
-       :max-concurrent-work : the maximum number of total messages processed.  This is mainly for
-                        asynch workflows; default num-workers
-       :dl-queue-name : the dead letter queue to which messages that are failed the maximum number of
-                        times will go (will be created if necessary).
-                        Defaults to (str queue-name \"-failed\")
-       :client        : the sqs client to use (if missing, sqs/mk-connection will create
-                        the client)
+
+    Optional arguments:
+    :message-channel-size - the number of messages to prefetch from sqs; default 20 * num-listeners
+    :num-workers   - the number of workers processing messages concurrently
+    :num-listeners - the number of listeners polling from sqs. default is (num-workers / 10)
+                     since each listener dequeues up to 10 messages at a time
+    :dequeue-limit - the number of messages to dequeue at a time; default 10
+    :max-concurrent-work - the maximum number of total messages processed.  This is mainly for
+                     asynch workflows; default num-workers
+    :client        - the sqs client to use (if missing, sqs/mk-connection will create
+                     the client)
    Output:
     a map with keys, :done-channel - the channel to send messages to be acked
                      :message-channel - unused by the client."
   [queue-name compute & opts]
   (let [options (->options-map opts)
-        dead-letter-queue-name (get-dead-letter-queue-name queue-name options)
-        connection (sqs/mk-connection queue-name
-                                      :dead-letter dead-letter-queue-name
-                                      :client      (:client options))
+        _ (dead-letter-deprecation-warning options)
+        connection (sqs/mk-connection queue-name :client (:client options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
         message-channel-size (get-message-channel-size listener-count options)
