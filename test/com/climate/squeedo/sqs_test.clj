@@ -23,6 +23,16 @@
     (com.amazonaws.services.sqs.model
       QueueDoesNotExistException)))
 
+(deftest test-parse-queue-name
+  (testing "Standard queue name"
+    (is (= {:name "foo" :fifo? false}
+           (sqs/parse-queue-name "foo"))))
+  (testing "Fifo queue name"
+    (is (= {:name "foo" :fifo? true}
+           (sqs/parse-queue-name "foo.fifo"))))
+  (testing "Invalid queue name"
+    (is (nil? (sqs/parse-queue-name "fifo.it")))))
+
 (deftest valid-queue-name
   (testing "Queue name validity with special characters"
     (is (thrown? IllegalArgumentException
