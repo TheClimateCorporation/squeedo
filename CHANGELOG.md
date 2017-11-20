@@ -10,7 +10,7 @@
   * support binary message attributes (#30)
   * remove bandalore as a source dependency
 
-## 0.2.3 (unreleased)
+## 0.2.3 (November 20, 2017)
 
 * fix default dead letter queue in SQS consumer when queue is a FIFO queue
 * support creating a FIFO queue when connecting to one that does not exist
