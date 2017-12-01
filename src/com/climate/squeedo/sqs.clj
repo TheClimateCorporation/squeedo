@@ -195,10 +195,13 @@
 (defn- send-message
   "Sends a new message with the given string body to the queue specified
   by the string URL.  Returns a map with :id and :body-md5 slots."
-  [^AmazonSQSClient client queue-url message & [message-attributes]]
-  (let [message-attribute-value-map (build-msg-attributes message-attributes)
+  [^AmazonSQSClient client queue-url message opts]
+  (let [{:keys [message-attributes message-group-id message-deduplication-id]} opts
+        message-attribute-value-map (build-msg-attributes message-attributes)
         send-message-request (cond-> (SendMessageRequest. queue-url message)
-                               message-attribute-value-map (.withMessageAttributes message-attribute-value-map))
+                               message-attribute-value-map (.withMessageAttributes message-attribute-value-map)
+                               message-group-id (.withMessageGroupId message-group-id)
+                               message-deduplication-id (.withMessageDeduplicationId message-deduplication-id))
         resp (.sendMessage client send-message-request)]
     {:id (.getMessageId resp)
      :body-md5 (.getMD5OfMessageBody resp)}))
@@ -213,14 +216,16 @@
     Optional arguments:
     :message-attributes - A map of SQS Attributes to apply to this message.
     :serialization-fn - A function that serializes the message you want to enqueue to a string
+    :message-group-id - This parameter applies to FIFO queues only
+    :message-deduplication-id - This parameter applies to FIFO queues only
+
     By default, pr-str will be used"
-  [queue-connection message & opts]
+  [queue-connection message & {:as opts}]
   (let [{:keys [client queue-name queue-url]} queue-connection
-        {:keys [message-attributes
-                serialization-fn]
+        {:keys [serialization-fn]
          :or {serialization-fn pr-str}} opts]
     (log/debugf "Enqueueing %s to %s" message queue-name)
-    (send-message client queue-url (serialization-fn message) message-attributes)))
+    (send-message client queue-url (serialization-fn message) (dissoc opts :serialization-fn))))
 
 (defn- clojurify-message-attributes
   [^Message msg]

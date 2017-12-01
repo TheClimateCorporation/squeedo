@@ -3,11 +3,15 @@
     [clojure.tools.logging :as log]
     [cemerick.bandalore :as bandalore]))
 
+(defn generate-queue-name
+  []
+  (format "test_squeedo_%s_%s"
+          (System/currentTimeMillis)
+          (rand-int Integer/MAX_VALUE)))
+
 (defn initialize-queue
   [queue-sym]
-  (let [queue-name (format "test_squeedo_%s_%s"
-                           (System/currentTimeMillis)
-                           (rand-int Integer/MAX_VALUE))]
+  (let [queue-name (generate-queue-name)]
     (log/infof "Using testing queue %s for %s" queue-name queue-sym)
     queue-name))
 
