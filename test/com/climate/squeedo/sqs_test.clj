@@ -15,7 +15,7 @@
     [clojure.test :refer :all]
     [clojure.tools.logging :as log]
     [com.climate.squeedo.sqs :as sqs]
-    [com.climate.squeedo.test-utils :refer [with-temporary-queues]]
+    [com.climate.squeedo.test-utils :refer [generate-queue-name with-temporary-queues]]
     [clojure.tools.reader.edn :as edn]
     [cheshire.core :as json]
     [cemerick.bandalore :as band])
@@ -194,6 +194,22 @@
             (is (= (json/generate-string input-message) (:body msg)))
             (is (= "some-value" (:some-attribute (:message-attributes msg))))
             (sqs/ack connection-3 msg)))))))
+
+(deftest ^:integration test-enqueue-fifo
+  (testing "fifo queue attributes"
+    (let [queue-name (str (generate-queue-name) ".fifo")]
+      (try
+        (sqs/configure-queue queue-name)
+        (let [connection (sqs/mk-connection queue-name)
+              _ (sqs/enqueue connection "foo"
+                             :message-group-id "1234"
+                             :message-deduplication-id "5678")
+              msg (dequeue-1 connection)]
+          (is (= "1234" (.get (:attributes msg) "MessageGroupId")))
+          (is (= "5678" (.get (:attributes msg) "MessageDeduplicationId"))))
+        (finally
+          (.deleteQueue (:client (sqs/mk-connection queue-name)) queue-name)
+          (log/infof "Deleted testing queue %s" queue-name))))))
 
 (deftest ^:integration test-dead-letter-redrive
   (with-temporary-queues
