@@ -1,6 +1,6 @@
-## 1.0.0-beta2 (unreleased)
+## 1.0.0-beta2 (December 7, 2017)
 
-* support fifo message attributes in `com.climate.squeedo.sqs/enqueue` via `:message-group-id` and `:message-deduplication-id`.
+* support FIFO message attributes in `com.climate.squeedo.sqs/enqueue` via `:message-group-id` and `:message-deduplication-id`.
 
 ## 1.0.0-beta1 (November 20, 2017)
 
