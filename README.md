@@ -47,7 +47,7 @@ In its simplest form, Squeedo is composed of only 2 parts, a compute function an
   [message done-channel]
   (println message)
   ;; never or limit the use of blocking IO calls here, use http-kit for these calls
-  (put! done-channel message)))
+  (put! done-channel message))
 
 (def consumer (start-consumer "my-sqs-queue" compute))
 
