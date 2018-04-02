@@ -30,6 +30,8 @@
               (map vector queue-syms)
               (apply concat)
               (vec))
-     ~@body
-     (let [client# (bandalore/create-client)]
-       (dorun (map (partial destroy-queue client#) ~queue-syms)))))
+     (try
+       ~@body
+       (finally
+         (let [client# (bandalore/create-client)]
+           (dorun (map (partial destroy-queue client#) ~queue-syms)))))))

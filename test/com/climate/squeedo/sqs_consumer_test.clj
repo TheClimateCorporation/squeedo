@@ -77,28 +77,26 @@
 (defn- stub-compute-fn [_ _] nil)
 
 
-(deftest test-create-queue-listener
+(deftest test-create-queue-listeners
   (testing "Verify messages up to the buffer-size are retrieved"
     (let [test-chan (chan 10)
           _ (doseq [i (range 4)]
               (>!! test-chan "ignored"))]
       (with-redefs [sqs/dequeue (fn [& _] [(<!! test-chan)])]
-        (let [listener (#'sqs-server/create-queue-listener nil 1 2 1)
-              message-channel (first listener)
-              buf (second listener)
+        (let [[message-chan buf] (#'sqs-server/create-queue-listeners nil 1 2 1)
               wait-and-check (fn [count]
                                (with-timeout 1000
                                              (while (< (.count buf) count)
                                                (Thread/sleep 100)))
                                (is (true? (.full? buf)))
                                (is (= (.count buf) count))
-                               (<!! message-channel))]
+                               (<!! message-chan))]
           (wait-and-check 2)
           (wait-and-check 2)
           (wait-and-check 2)
           (is (false? (.full? buf)))
           (is (= 1 (.count buf)))
-          (close! message-channel))))))
+          (close! message-chan))))))
 
 (deftest create-workers
   (testing "Verify workers ack processed messages"
@@ -119,35 +117,35 @@
              worker-size defaults to number of cpus - 1 and
              num-listeners is 1
              dequeue-limit is 10"
-      (with-redefs [sqs-server/create-queue-listener (fn [_ num-listeners message-channel-size dequeue-limit]
-                                                       (is (= 20 message-channel-size))
-                                                       (is (= (-> (#'sqs-server/get-available-processors)
-                                                                  (- 1)
-                                                                  (/ 10)
-                                                                  int
-                                                                  (max 1))
-                                                              num-listeners))
-                                                       (is (= 10 dequeue-limit))
-                                                       [1])
+      (with-redefs [sqs-server/create-queue-listeners (fn [_ num-listeners message-channel-size dequeue-limit]
+                                                        (is (= 20 message-channel-size))
+                                                        (is (= (-> (#'sqs-server/get-available-processors)
+                                                                   (- 1)
+                                                                   (/ 10)
+                                                                   int
+                                                                   (max 1))
+                                                               num-listeners))
+                                                        (is (= 10 dequeue-limit))
+                                                        [1 nil])
                     sqs-server/create-workers (fn [_ num-workers _ _ _]
                                                 (is (= num-workers
                                                        (- (#'sqs-server/get-available-processors)
                                                           1))))]
         (is (sqs-server/start-consumer "q" (fn [_ _] println)))))
     (testing "message-channel-size can be configured"
-      (with-redefs [sqs-server/create-queue-listener (fn [_ _ message-channel-size _]
-                                                       (is (= 10 message-channel-size))
-                                                       [1])
+      (with-redefs [sqs-server/create-queue-listeners (fn [_ _ message-channel-size _]
+                                                        (is (= 10 message-channel-size))
+                                                        [1 nil])
                     sqs-server/create-workers (fn [_ _ _ _ _] nil)]
         (is (sqs-server/start-consumer "q" stub-compute-fn :message-channel-size 10))))
     (testing "worker-size can be configured"
-      (with-redefs [sqs-server/create-queue-listener (fn [_ _ _ _] [1])
+      (with-redefs [sqs-server/create-queue-listeners (fn [_ _ _ _] [1 nil])
                     sqs-server/create-workers (fn [_ num-workers _ _ _] (is (= 100 num-workers)))]
         (is (sqs-server/start-consumer "q" stub-compute-fn :num-workers 100))))
     (testing "num-listeners can be configured"
-      (with-redefs [sqs-server/create-queue-listener (fn [_ num-listeners _ _]
-                                                       (is (= 10 num-listeners))
-                                                       [1])
+      (with-redefs [sqs-server/create-queue-listeners (fn [_ num-listeners _ _]
+                                                        (is (= 10 num-listeners))
+                                                        [1 nil])
                     sqs-server/create-workers (fn [_ _ _ _ _] nil)]
         (sqs-server/start-consumer "q" stub-compute-fn :num-listeners 10))))
   (testing "mk-connection"
@@ -156,7 +154,7 @@
                                       {:client "client"
                                        :queue-name q-name
                                        :queue-url "http://"})
-                  sqs-server/create-queue-listener (fn [_ _ _ _] [1])
+                  sqs-server/create-queue-listeners (fn [_ _ _ _] [1 nil])
                   sqs-server/create-workers (fn [_ _ _ _ _] nil)]
       (is (sqs-server/start-consumer ::name stub-compute-fn))))
   (testing "options can be configured via map"
@@ -181,13 +179,13 @@
                                         (is (= queue-name input-queue-name))
                                         (is (= client input-client))
                                         stub-connection)
-                    sqs-server/create-queue-listener (fn [input-connection input-listener-count
-                                                          input-message-channel-size input-dequeue-limit]
-                                                       (is (= stub-connection input-connection))
-                                                       (is (= message-channel-size input-message-channel-size))
-                                                       (is (= listener-count input-listener-count))
-                                                       (is (= dequeue-limit input-dequeue-limit))
-                                                       [stub-message-channel])
+                    sqs-server/create-queue-listeners (fn [input-connection input-listener-count
+                                                           input-message-channel-size input-dequeue-limit]
+                                                        (is (= stub-connection input-connection))
+                                                        (is (= message-channel-size input-message-channel-size))
+                                                        (is (= listener-count input-listener-count))
+                                                        (is (= dequeue-limit input-dequeue-limit))
+                                                        [stub-message-channel nil])
                     sqs-server/create-workers (fn [input-connection input-worker-count input-max-concurrent-work
                                                    input-message-channel input-compute-fn]
                                                 (is (= stub-connection input-connection))
@@ -217,15 +215,13 @@
         (is (= @tracker num-workers))
         (sqs-server/stop-consumer consumer)))))
 
-(deftest ^:integration test-create-queue-listener-integration
+(deftest ^:integration test-create-queue-listeners-integration
   (testing "Verify messages up to the buffer-size are retrieved"
     (with-temporary-queues
       [queue-name]
       (sqs/configure-queue queue-name)
       (let [connection (sqs/mk-connection queue-name)
-            listener (#'sqs-server/create-queue-listener connection 1 2 1)
-            message-channel (first listener)
-            buf (second listener)
+            [message-chan buf] (#'sqs-server/create-queue-listeners connection 1 2 1)
             _ (doseq [i (range 4)] (sqs/enqueue connection i))
             wait-and-check (fn [count]
                              (with-timeout 10000
@@ -233,13 +229,13 @@
                                  (Thread/sleep 100)))
                              (is (true? (.full? buf)))
                              (is (= (.count buf) count))
-                             (<!! message-channel))]
+                             (<!! message-chan))]
         (wait-and-check 2)
         (wait-and-check 2)
         (wait-and-check 2)
         (is (false? (.full? buf)))
         (is (= (.count buf) 1))
-        (close! message-channel)))))
+        (close! message-chan)))))
 
 (deftest ^:integration consumer-happy-path
   (testing "Verify it consumes all messages properly"
@@ -372,7 +368,7 @@
 
 ;; run this to see how good squeedo works with cpu and async non-blocking IO
 ;; on my 8 core machine i can drive cpu usage to 750%
-(deftest ^:manual example-awesome-cpu-usage
+(deftest ^:example-cpu example-awesome-cpu-usage
   (with-temporary-queues
     [queue-name]
     (sqs/configure-queue queue-name)
@@ -394,3 +390,44 @@
       (Thread/sleep 100)
       (is (= num-messages @tracker))
       (sqs-server/stop-consumer consumer))))
+
+(defmacro with-temporary-queue-collection
+  "Create num-queues number of SQS queues and bind a vector to sym containing the
+  queues, presumably for testing large numbers of queues."
+  [num-queues sym & body]
+  (let [syms (vec (repeatedly num-queues gensym))]
+    `(with-temporary-queues ~syms
+       (let [~sym ~syms]
+         ~@body))))
+
+;; run this to see how squeedo can be configured to work with large number
+;; of sqs queues (using listener threads).
+;; on my machine this takes about 20 seconds, compared to about 120 seconds
+;; without dedicated listener threads.
+(deftest ^:example-listener-threads example-large-number-of-queues
+  (let [compute-fn (fn [msg done-chan]
+                     (put! done-chan msg)
+                     (swap! tracker inc))]
+
+    (with-temporary-queue-collection 60 queues
+
+      ;; setup
+      (is (= 60 (count queues)))
+      (run! sqs/configure-queue queues)
+      (cp/upmap 20 #(sqs/enqueue (sqs/mk-connection %) "hello world!") queues)
+
+      ;; start the consumers
+      (let [start (System/currentTimeMillis)
+            consumers (doall
+                        (for [queue queues]
+                          (sqs-server/start-consumer queue compute-fn
+                                                     :num-listeners 1
+                                                     :num-workers 1
+                                                     :listener-threads? true)))]
+        (wait-for-messages (count queues) 100000)
+        (is (= (count queues) @tracker)) ;; got all messages?
+        (println "total for" (count queues) "queues: " (- (System/currentTimeMillis) start))
+
+        ;; cleanup (physical SQS queues are deleted via `with-temporary-queues`)
+        (doseq [consumer consumers]
+          (sqs-server/stop-consumer consumer))))))

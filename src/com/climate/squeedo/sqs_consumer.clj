@@ -14,25 +14,43 @@
   "Functions for using Amazon Simple Queueing Service to request and perform
   computation."
   (:require
-    [clojure.core.async :refer [close! go-loop go >! <! chan buffer onto-chan]]
+    [clojure.core.async :refer [close! go-loop go thread >! <! <!! chan buffer onto-chan]]
     [clojure.core.async.impl.protocols :refer [closed?]]
     [com.climate.squeedo.sqs :as sqs]))
 
-(defn- create-queue-listener
-  "Kick off a listener in the background that eagerly grabs messages as quickly
-  as possible and fetches them into a buffered channel.  This will park the thread
+(defn- create-queue-listeners
+  "Kick off listeners in the background that eagerly grab messages as quickly
+  as possible and fetch them into a buffered channel.  This will park the thread
   if the message channel is full. (ie. don't prefetch too many messages as there is a memory
   impact, and they have to get processed before timing out.)"
   [connection num-listeners buffer-size dequeue-limit]
   (let [buf (buffer buffer-size)
-        message-channel (chan buf)]
+        message-chan (chan buf)]
     (dotimes [_ num-listeners]
-      (go (while
-            (let [messages (sqs/dequeue connection :limit dequeue-limit)]
-              ; block until all messages are put onto message-channel
-              (<! (onto-chan message-channel messages false))
-              (not (closed? message-channel))))))
-    [message-channel buf]))
+      (go
+        (while
+          (let [messages (sqs/dequeue connection :limit dequeue-limit)]
+            ; park until all messages are put onto message-channel
+            (<! (onto-chan message-chan messages false))
+            (not (closed? message-chan))))))
+    [message-chan buf]))
+
+(defn- create-dedicated-queue-listeners
+  "Similar to `create-queue-listeners` but listeners are created on dedicated
+  threads and will be blocked when the message channel is full.
+  Potentially useful when consuming from large numbers of SQS queues within
+  a single program."
+  [connection num-listeners buffer-size dequeue-limit]
+  (let [buf (buffer buffer-size)
+        message-chan (chan buf)]
+    (dotimes [_ num-listeners]
+      (thread
+        (while
+          (let [messages (sqs/dequeue connection :limit dequeue-limit)]
+            ; block until all messages are put onto message-channel
+            (<!! (onto-chan message-chan messages false))
+            (not (closed? message-chan))))))
+    [message-chan buf]))
 
 (defn- create-workers
   "Create workers to run the compute function. Workers are expected to be CPU bound or handle all IO in an asynchronous
@@ -90,6 +108,10 @@
   (or (:num-listeners options)
       (max 1 (int (/ worker-count 10)))))
 
+(defn- get-listener-threads
+  [options]
+  (or (:listener-threads? options) false))
+
 (defn- get-message-channel-size
   [listener-count options]
   (or (:message-channel-size options)
@@ -138,6 +160,8 @@
     :num-workers   - the number of workers processing messages concurrently
     :num-listeners - the number of listeners polling from sqs. default is (num-workers / 10)
                      since each listener dequeues up to 10 messages at a time
+    :listener-threads? - run listeners in dedicated threads. if true, will create
+                     one thread per listener.
     :dequeue-limit - the number of messages to dequeue at a time; default 10
     :max-concurrent-work - the maximum number of total messages processed.  This is mainly for
                      asynch workflows; default num-workers
@@ -152,13 +176,17 @@
         connection (sqs/mk-connection queue-name :client (:client options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
-        message-channel-size (get-message-channel-size listener-count options)
+        message-chan-size (get-message-channel-size listener-count options)
         max-concurrent-work (get-max-concurrent-work worker-count options)
         dequeue-limit (get-dequeue-limit options)
-        message-channel (first (create-queue-listener
-                                 connection listener-count message-channel-size dequeue-limit))
-        done-channel (create-workers connection worker-count max-concurrent-work message-channel compute)]
-    {:done-channel done-channel :message-channel message-channel}))
+        [message-chan _] (if (get-listener-threads options)
+                           (create-dedicated-queue-listeners
+                             connection listener-count message-chan-size dequeue-limit)
+                           (create-queue-listeners
+                             connection listener-count message-chan-size dequeue-limit))
+        done-chan (create-workers
+                    connection worker-count max-concurrent-work message-chan compute)]
+    {:done-channel done-chan :message-channel message-chan}))
 
 (defn stop-consumer
   "Takes a consumer created by start-consumer and closes the channels.
