@@ -1,3 +1,8 @@
+## 1.0.1 (April 24, 2018)
+
+* option to run listeners in dedicated threads instead of in core.async go
+  threads (#37).
+
 ## 1.0.0 (February 26, 2018)
 
 * no changes from `1.0.0-beta2`.
