@@ -8,7 +8,6 @@ in its raw format, so it's up to the caller to determine the proper reader for t
 ## Latest version
 
 [![Clojars Project](http://clojars.org/com.climate/squeedo/latest-version.svg)](http://clojars.org/com.climate/squeedo)
-[![Dependencies Status](http://jarkeeper.com/TheClimateCorporation/squeedo/status.svg)](http://jarkeeper.com/TheClimateCorporation/squeedo)
 
 ## Changes
 
@@ -178,7 +177,7 @@ Example of setting up a queue with custom attributes and a dead letter queue:
 
 ## License
 
-Copyright (C) 2017 The Climate Corporation. Distributed under the Apache
+Copyright (C) 2018 The Climate Corporation. Distributed under the Apache
 License, Version 2.0.  You may not use this library except in compliance with
 the License. You may obtain a copy of the License at
 
