@@ -52,37 +52,44 @@
             (not (closed? message-chan))))))
     [message-chan buf]))
 
+(defn- worker
+  [work-token-chan message-chan compute done-chan]
+  (go-loop []
+    (>! work-token-chan :token)
+    (when-let [message (<! message-chan)]
+      (try
+        (compute message done-chan)
+        (catch Throwable _
+          (>! done-chan (assoc message :nack true))))
+      (recur))))
+
+(defn- acker
+  [connection work-token-chan done-chan]
+  (go-loop []
+    (when-let [message (<! done-chan)]
+      ; free up the work-token-chan
+      (<! work-token-chan)
+      ; (n)ack the message asynchronously
+      (let [nack (:nack message)]
+        (go
+          (cond
+            (integer? nack) (sqs/nack connection message (:nack message))
+            nack            (sqs/nack connection message)
+            :else           (sqs/ack connection message))))
+      (recur))))
+
 (defn- create-workers
   "Create workers to run the compute function. Workers are expected to be CPU bound or handle all IO in an asynchronous
   manner. In the future we may add an option to run computes in a thread/pool that isn't part of the core.async's
   threadpool."
-  [connection worker-size max-concurrent-work message-channel compute]
-  (let [done-channel (chan worker-size)
+  [connection worker-size max-concurrent-work message-chan compute]
+  (let [done-chan (chan worker-size)
         ; the work-token-channel ensures we only have a fixed numbers of messages processed at one time
-        work-token-channel (chan max-concurrent-work)]
+        work-token-chan (chan max-concurrent-work)]
     (dotimes [_ worker-size]
-      (go-loop []
-        (>! work-token-channel :token)
-        (when-let [message (<! message-channel)]
-          (try
-            (compute message done-channel)
-            (catch Throwable _
-              (>! done-channel (assoc message :nack true))))
-          (recur))))
-
-    (go-loop []
-      (when-let [message (<! done-channel)]
-        (do
-          ; free up the work-token-channel
-          (<! work-token-channel)
-          ; (n)ack the message asynchronously
-          (let [nack (:nack message)]
-            (cond
-              (integer? nack) (go (sqs/nack connection message (:nack message)))
-              nack            (go (sqs/nack connection message))
-              :else           (go (sqs/ack connection message))))
-          (recur))))
-    done-channel))
+      (worker work-token-chan message-chan compute done-chan))
+    (acker connection work-token-chan done-chan)
+    done-chan))
 
 (defn- ->options-map
   "If options are provided as a map, return it as-is; otherwise, the options are provided as varargs and must be
