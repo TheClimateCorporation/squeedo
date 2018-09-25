@@ -1,4 +1,4 @@
-## Unreleased
+## 1.0.2 (September 25, 2018)
 
 * refactor consumer implementation to shorten class file names (#43).
 
