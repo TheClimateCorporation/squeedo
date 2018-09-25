@@ -10,7 +10,7 @@
 ;; "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 ;; or implied.  See the License for the specific language governing permissions
 ;; and limitations under the License.
-(defproject com.climate/squeedo "1.0.2"
+(defproject com.climate/squeedo "1.0.3-SNAPSHOT"
   :description "Squeedo: The sexiest message consumer ever (™)"
   :url "http://github.com/TheClimateCorporation/squeedo/"
   :min-lein-version "2.0.0"
