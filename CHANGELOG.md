@@ -1,3 +1,7 @@
+## Unreleased
+
+* refactor consumer implementation to shorten class file names (#43).
+
 ## 1.0.1 (April 24, 2018)
 
 * option to run listeners in dedicated threads instead of in core.async go
