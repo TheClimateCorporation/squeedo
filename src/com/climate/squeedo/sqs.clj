@@ -13,6 +13,7 @@
 (ns com.climate.squeedo.sqs
   (:require
     [clojure.tools.logging :as log]
+    [again.core :as again]
     [cheshire.core :as json])
   (:import
     (com.amazonaws.services.sqs.model
@@ -301,7 +302,8 @@
 
   This does *not* remove the messages from the queue! For that, see ack.
 
-  In case of exception, logs the exception and returns []."
+  If there was an exception getting the messages, retry after 100, 200, 400, and 800 ms,
+  then log the exception and return []."
   [{:keys [client queue-name queue-url]}
    & {:keys [limit attributes message-attributes]
       :or {limit 10
@@ -311,15 +313,17 @@
   (log/debugf "Attempting dequeue from %s" queue-name)
   ;; will have a single queue/connection
   (try
-    (->> (receive client
-                  queue-url
-                  :wait-time-seconds poll-timeout-seconds
-                  :limit limit
-                  :attributes attributes
-                  :message-attribute-names message-attributes)
-         (map (fn [m]
-                (log/debugf "Dequeued from queue %s message %s" queue-name m)
-                (assoc m :queue-name queue-name))))
+    (again/with-retries
+      [100 200 400 800]
+      (->> (receive client
+                    queue-url
+                    :wait-time-seconds poll-timeout-seconds
+                    :limit limit
+                    :attributes attributes
+                    :message-attribute-names message-attributes)
+           (map (fn [m]
+                  (log/debugf "Dequeued from queue %s message %s" queue-name m)
+                  (assoc m :queue-name queue-name)))))
     (catch Exception e
       (log/error e "Encountered exception dequeueing.")
       [])))

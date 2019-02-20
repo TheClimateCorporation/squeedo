@@ -21,6 +21,7 @@
                  [org.clojure/tools.logging "0.4.0"]
                  [org.clojure/core.async "0.4.474"]
                  [cheshire "5.8.0"]
+                 [listora/again "0.1.0"]
                  [com.amazonaws/aws-java-sdk-sqs "1.11.306"]]
 
   :profiles {:dev {:global-vars {*warn-on-reflection* true}

@@ -53,6 +53,45 @@
   (testing "Queue with .fifo suffix"
     (is (nil? (sqs/validate-queue-name! "hello-world.fifo")))))
 
+(deftest test-dequeue
+  (let [client {:dummy :client}
+        messages [{:message "message1"} {:message "message2"}]
+        expected [{:message "message1", :queue-name "queue-name"} {:message "message2", :queue-name "queue-name"}]]
+    (testing "Params passed through correctly"
+      (with-redefs [sqs/receive (fn [sqs-client queue-url & {:keys [limit visibility wait-time-seconds attributes message-attribute-names]}]
+                                  (are [a b] (= a b)
+                                             client sqs-client
+                                             "URL" queue-url
+                                             2 limit
+                                             #{"Attribute"} attributes
+                                             #{"AttributeName"} message-attribute-names)
+                                  messages)]
+        (is (= expected
+               (sqs/dequeue {:client     {:dummy :client}
+                             :queue-name "queue-name"
+                             :queue-url  "URL"}
+                            :limit 2
+                            :attributes #{"Attribute"}
+                            :message-attributes #{"AttributeName"})))))
+    (testing "retry and succeed"
+      (let [retry (atom 0)]
+        (with-redefs [sqs/receive (fn [& _]
+                                    (when (< @retry 4)
+                                      (swap! retry inc)
+                                      (throw (Exception. "SomeException")))
+                                    messages)]
+          (is (= expected
+                 (sqs/dequeue {:queue-name "queue-name"}))))))
+    (testing "retry and fail returns []"
+      (let [retry (atom 0)]
+        (with-redefs [sqs/receive (fn [& _]
+                                    (when (< @retry 5)
+                                      (swap! retry inc)
+                                      (throw (Exception. "SomeException")))
+                                    messages)]
+          (is (= []
+                 (sqs/dequeue {:queue-name "queue-name"}))))))))
+
 (defn dequeue-1
   "Convenience function for some of these tests"
   [connection]
