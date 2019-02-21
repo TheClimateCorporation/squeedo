@@ -14,42 +14,55 @@
   "Functions for using Amazon Simple Queueing Service to request and perform
   computation."
   (:require
-    [clojure.core.async :refer [close! go-loop go thread >! <! <!! chan buffer onto-chan]]
+    [clojure.core.async :refer [close! go-loop go thread >! <! <!! chan buffer onto-chan timeout]]
     [clojure.core.async.impl.protocols :refer [closed?]]
+    [clojure.tools.logging :as log]
     [com.climate.squeedo.sqs :as sqs]))
 
 (defn- create-queue-listeners
-  "Kick off listeners in the background that eagerly grab messages as quickly
-  as possible and fetch them into a buffered channel.  This will park the thread
-  if the message channel is full. (ie. don't prefetch too many messages as there is a memory
-  impact, and they have to get processed before timing out.)"
-  [connection num-listeners buffer-size dequeue-limit]
+  "Kick off listeners in the background that eagerly grab messages as quickly as possible and fetch them into a buffered
+  channel.
+
+  This will park the thread if the message channel is full. (ie. don't prefetch too many messages as there is
+  a memory impact, and they have to get processed before timing out.)
+
+  If there is an Exception while trying to poll for messages, wait exceptional-poll-delay-ms before trying again."
+  [connection num-listeners buffer-size dequeue-limit exceptional-poll-delay-ms]
   (let [buf (buffer buffer-size)
         message-chan (chan buf)]
     (dotimes [_ num-listeners]
-      (go
-        (while
-          (let [messages (sqs/dequeue connection :limit dequeue-limit)]
+      (go-loop []
+        (try
+          (let [messages (sqs/dequeue* connection :limit dequeue-limit)]
             ; park until all messages are put onto message-channel
-            (<! (onto-chan message-chan messages false))
-            (not (closed? message-chan))))))
+            (<! (onto-chan message-chan messages false)))
+          (catch Throwable t
+            (log/errorf t "Encountered exception dequeueing.  Waiting %d ms before trying again." exceptional-poll-delay-ms)
+            (<! (timeout exceptional-poll-delay-ms))))
+        (when (not (closed? message-chan))
+          (recur))))
     [message-chan buf]))
 
 (defn- create-dedicated-queue-listeners
-  "Similar to `create-queue-listeners` but listeners are created on dedicated
-  threads and will be blocked when the message channel is full.
-  Potentially useful when consuming from large numbers of SQS queues within
-  a single program."
-  [connection num-listeners buffer-size dequeue-limit]
+  "Similar to `create-queue-listeners` but listeners are created on dedicated threads and will be blocked when the
+  message channel is full.  Potentially useful when consuming from large numbers of SQS queues within a single program.
+
+  If there is an Exception while trying to poll for messages, wait exceptional-poll-delay-ms before trying again."
+  [connection num-listeners buffer-size dequeue-limit exceptional-poll-delay-ms]
   (let [buf (buffer buffer-size)
         message-chan (chan buf)]
     (dotimes [_ num-listeners]
       (thread
-        (while
-          (let [messages (sqs/dequeue connection :limit dequeue-limit)]
-            ; block until all messages are put onto message-channel
-            (<!! (onto-chan message-chan messages false))
-            (not (closed? message-chan))))))
+        (loop []
+          (try
+            (let [messages (sqs/dequeue* connection :limit dequeue-limit)]
+              ; block until all messages are put onto message-channel
+              (<!! (onto-chan message-chan messages false)))
+            (catch Throwable t
+              (log/errorf t "Encountered exception dequeueing.  Waiting %d ms before trying again." exceptional-poll-delay-ms)
+              (Thread/sleep exceptional-poll-delay-ms)))
+          (when (not (closed? message-chan))
+            (recur)))))
     [message-chan buf]))
 
 (defn- worker
@@ -134,6 +147,11 @@
   (or (:dequeue-limit options)
       10))
 
+(defn- get-exceptional-poll-delay-ms
+  [options]
+  (or (:exceptional-poll-delay-ms options)
+      10000))
+
 (defn- dead-letter-deprecation-warning
   [options]
   (when (:dl-queue-name options)
@@ -162,20 +180,20 @@
     compute - a compute function that takes two args: a 'message' containing the body of the sqs
               message and a channel on which to ack/nack when done.
 
-    Optional arguments:
-    :message-channel-size - the number of messages to prefetch from sqs; default 20 * num-listeners
-    :num-workers   - the number of workers processing messages concurrently
-    :num-listeners - the number of listeners polling from sqs. default is (num-workers / 10)
-                     since each listener dequeues up to 10 messages at a time
-    :listener-threads? - run listeners in dedicated threads. if true, will create
-                     one thread per listener.
-    :dequeue-limit - the number of messages to dequeue at a time; default 10
-    :max-concurrent-work - the maximum number of total messages processed.  This is mainly for
-                     asynch workflows; default num-workers
-    :client        - the sqs client to use (if missing, sqs/mk-connection will create
-                     the client)
+   Optional arguments:
+    :message-channel-size      - the number of messages to prefetch from sqs; default 20 * num-listeners
+    :num-workers               - the number of workers processing messages concurrently
+    :num-listeners             - the number of listeners polling from sqs; default is (num-workers / 10) because each
+                                 listener dequeues up to 10 messages at a time
+    :listener-threads?         - run listeners in dedicated threads; if true, will create one thread per listener
+    :dequeue-limit             - the number of messages to dequeue at a time; default 10
+    :max-concurrent-work       - the maximum number of total messages processed.  This is mainly for async workflows;
+                                 default num-workers
+    :client                    - the SQS client to use (if missing, sqs/mk-connection will create a client)
+    :exceptional-poll-delay-ms - when an Exception is received while polling, the number of ms we wait until polling
+                                 again.  Default is 10000 (10 seconds).
    Output:
-    a map with keys, :done-channel - the channel to send messages to be acked
+    a map with keys, :done-channel    - the channel to send messages to be acked
                      :message-channel - unused by the client."
   [queue-name compute & opts]
   (let [options (->options-map opts)
@@ -186,11 +204,12 @@
         message-chan-size (get-message-channel-size listener-count options)
         max-concurrent-work (get-max-concurrent-work worker-count options)
         dequeue-limit (get-dequeue-limit options)
+        exceptional-poll-delay-ms (get-exceptional-poll-delay-ms options)
         [message-chan _] (if (get-listener-threads options)
                            (create-dedicated-queue-listeners
-                             connection listener-count message-chan-size dequeue-limit)
+                             connection listener-count message-chan-size dequeue-limit exceptional-poll-delay-ms)
                            (create-queue-listeners
-                             connection listener-count message-chan-size dequeue-limit))
+                             connection listener-count message-chan-size dequeue-limit exceptional-poll-delay-ms))
         done-chan (create-workers
                     connection worker-count max-concurrent-work message-chan compute)]
     {:done-channel done-chan :message-channel message-chan}))

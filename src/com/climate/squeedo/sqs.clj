@@ -293,6 +293,30 @@
          (.getMessages)
          (map (partial message-map queue-url)))))
 
+(defn dequeue*
+  "Read messages from a queue. If there is nothing to read before poll-timeout-seconds, return [].
+
+  This does *not* remove the messages from the queue! For that, see ack.
+
+  Does not catch Exceptions that might be thrown while attempting to receive messages from the queue."
+  [{:keys [client queue-name queue-url]}
+   & {:keys [limit attributes message-attributes]
+      :or   {limit              10
+             attributes         #{"All"}
+             message-attributes #{"All"}}}]
+  ;; Log at debug so we don't spam about polling.
+  (log/debugf "Attempting dequeue from %s" queue-name)
+  ;; will have a single queue/connection
+  (->> (receive client
+                queue-url
+                :wait-time-seconds poll-timeout-seconds
+                :limit limit
+                :attributes attributes
+                :message-attribute-names message-attributes)
+       (map (fn [m]
+              (log/debugf "Dequeued from queue %s message %s" queue-name m)
+              (assoc m :queue-name queue-name)))))
+
 ;; Raw message is being returned, so it's up to the user to determine the proper reader for their needs.
 ;; NaN,Infinity,-Infinity http://dev.clojure.org/jira/browse/CLJ-1074
 (defn dequeue
@@ -302,24 +326,9 @@
   This does *not* remove the messages from the queue! For that, see ack.
 
   In case of exception, logs the exception and returns []."
-  [{:keys [client queue-name queue-url]}
-   & {:keys [limit attributes message-attributes]
-      :or {limit 10
-           attributes #{"All"}
-           message-attributes #{"All"}}}]
-  ;; Log at debug so we don't spam about polling.
-  (log/debugf "Attempting dequeue from %s" queue-name)
-  ;; will have a single queue/connection
+  [& args]
   (try
-    (->> (receive client
-                  queue-url
-                  :wait-time-seconds poll-timeout-seconds
-                  :limit limit
-                  :attributes attributes
-                  :message-attribute-names message-attributes)
-         (map (fn [m]
-                (log/debugf "Dequeued from queue %s message %s" queue-name m)
-                (assoc m :queue-name queue-name))))
+    (apply dequeue* args)
     (catch Exception e
       (log/error e "Encountered exception dequeueing.")
       [])))
