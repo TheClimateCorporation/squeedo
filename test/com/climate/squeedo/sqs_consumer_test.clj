@@ -109,7 +109,7 @@
               [message-chan _] (#'sqs-server/create-queue-listeners nil 1 2 1 retry-ms)
               start-ms (System/currentTimeMillis)]
           (<!! message-chan)
-          (is (> (- (System/currentTimeMillis) start-ms) retry-ms))
+          (is (>= (- (System/currentTimeMillis) start-ms) retry-ms))
           (close! message-chan))))))
 
 (deftest test-create-dedicated-queue-listeners
@@ -135,22 +135,18 @@
           (is (= 1 (.count buf)))
           (close! message-chan)))))
   (testing "Verify retry after specified ms"
-    (let [first-call (atom true)
-          second-call (atom false)]
+    (let [call-number (atom 0)]
       (with-redefs [sqs/dequeue* (fn [& _]
-                                   (when @first-call
-                                     (reset! first-call false)
-                                     (reset! second-call true)
-                                     (throw (Exception. "thrown first time only")))
-                                   (if @second-call
-                                     (do (reset! second-call false)
-                                         ["msg1" "msg2" "msg3" "msg4"])
-                                     []))]
+                                   (swap! call-number inc)
+                                   (case @call-number
+                                         1 (throw (Exception. "thrown first time only"))
+                                         2 ["msg1" "msg2" "msg3" "msg4"]
+                                         []))]
         (let [retry-ms 123
               [message-chan _] (#'sqs-server/create-dedicated-queue-listeners nil 1 2 1 retry-ms)
               start-ms (System/currentTimeMillis)]
           (<!! message-chan)
-          (is (> (- (System/currentTimeMillis) start-ms) retry-ms))
+          (is (>= (- (System/currentTimeMillis) start-ms) retry-ms))
           (close! message-chan))))))
 
 (deftest create-workers
