@@ -53,6 +53,34 @@
   (testing "Queue with .fifo suffix"
     (is (nil? (sqs/validate-queue-name! "hello-world.fifo")))))
 
+(deftest test-dequeue
+  (let [client {:dummy :client}
+        messages [{:message "message1"} {:message "message2"}]
+        expected [{:message "message1", :queue-name "queue-name"} {:message "message2", :queue-name "queue-name"}]]
+    (testing "params passed through correctly"
+      (with-redefs [sqs/receive (fn [sqs-client queue-url & {:keys [limit _ _ attributes message-attribute-names]}]
+                                  (are [a b] (= a b)
+                                             client sqs-client
+                                             "URL" queue-url
+                                             2 limit
+                                             #{"Attribute"} attributes
+                                             #{"AttributeName"} message-attribute-names)
+                                  messages)]
+        (is (= expected
+               (sqs/dequeue {:client     {:dummy :client}
+                             :queue-name "queue-name"
+                             :queue-url  "URL"}
+                            :limit 2
+                            :attributes #{"Attribute"}
+                            :message-attributes #{"AttributeName"})))))
+    (with-redefs [sqs/receive (fn [& _]
+                                (throw (Exception. "SomeException")))]
+      (testing "dequeue swallows exceptions"
+        (is (= []
+               (sqs/dequeue {:queue-name "queue-name"}))))
+      (testing "dequeue* does not swallow exceptions"
+        (is (thrown-with-msg? Exception #"SomeException" (sqs/dequeue* {:queue-name "queue-name"})))))))
+
 (defn dequeue-1
   "Convenience function for some of these tests"
   [connection]
