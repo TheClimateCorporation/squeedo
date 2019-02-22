@@ -1,3 +1,10 @@
+## Unreleased
+
+* protect clients from aggressive consumer dequeueing when the SQS client returns an exception.
+  introduces new configuration option, `:exceptional-poll-delay-ms`, with a new default
+  behavior of timing out for 10 seconds if an exception occurs when dequeueing. (thanks @stephencrampton!)
+* by default, use `.getStringValue` when clojurifying MessageAttributeValue objects. (thanks @danieltdt!)
+
 ## 1.0.2 (September 25, 2018)
 
 * refactor consumer implementation to shorten class file names (#43).
