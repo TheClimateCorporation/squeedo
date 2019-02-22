@@ -235,7 +235,8 @@
                 [(keyword k) (case (.getDataType mav)
                                "String" (.getStringValue mav)
                                "Number" (.getStringValue mav)
-                               "Binary" (.getBinaryValue mav))]))
+                               "Binary" (.getBinaryValue mav)
+                               (.getStringValue mav))]))
          (into {}))))
 
 (defn- message-map
