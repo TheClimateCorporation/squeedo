@@ -1,4 +1,4 @@
-## Unreleased
+## 1.1.0 (Unreleased)
 
 * protect clients from aggressive consumer dequeueing when the SQS client returns an exception.
   introduces new configuration option, `:exceptional-poll-delay-ms`, with a new default
