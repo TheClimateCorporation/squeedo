@@ -1,3 +1,8 @@
+## 1.1.2 (May 29, 2019)
+
+* update sqs namespace to use the AmazonSQS interface rather than the implementation class AmazonSqsClient
+  to allow injecting other AmazonSQS implementations.
+
 ## 1.1.0 (February 26, 2019)
 
 * protect clients from aggressive consumer dequeueing when the SQS client returns an exception.
