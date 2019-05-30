@@ -23,7 +23,7 @@
       ReceiveMessageRequest
       SendMessageRequest)
     (com.amazonaws.services.sqs
-      AmazonSQSClient
+      AmazonSQS
       AmazonSQSClientBuilder)))
 
 
@@ -74,7 +74,7 @@
 (defn- redrive-policy
   "Encode the RedrivePolicy for a dead letter queue.
   http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/SQSDeadLetterQueue.html"
-  [^AmazonSQSClient client ^String dead-letter-url]
+  [^AmazonSQS client ^String dead-letter-url]
   (let [queue-arn (-> client
                       (.getQueueAttributes dead-letter-url ["QueueArn"])
                       (.getAttributes)
@@ -89,7 +89,7 @@
 
   Optionally takes a dead letter queue URL (Amazon Resource Name),
   a queue that already exists, that gets associated with the returned queue."
-  [^AmazonSQSClient client ^String queue-url queue-attrs dead-letter-url]
+  [^AmazonSQS client ^String queue-url queue-attrs dead-letter-url]
   (let [default-attrs {"DelaySeconds"                  0       ; delay after enqueue
                        "MessageRetentionPeriod"        1209600 ; max, 14 days
                        "ReceiveMessageWaitTimeSeconds" poll-timeout-seconds
@@ -106,7 +106,7 @@
 (defn- get-or-create-queue
   "Get or create SQS queue for the given queue name. Returns the queue URL
   (Amazon Resource Name)."
-  [^AmazonSQSClient client ^String queue-name]
+  [^AmazonSQS client ^String queue-name]
   (try
     (.getQueueUrl (.getQueueUrl client queue-name))
     (catch QueueDoesNotExistException _
@@ -171,7 +171,7 @@
   [^String queue-name & {:keys [client] :as options}]
   (dead-letter-deprecation-warning options)
   (validate-queue-name! queue-name)
-  (let [^AmazonSQSClient client (or client (default-client))
+  (let [^AmazonSQS client (or client (default-client))
         queue-url (.getQueueUrl (.getQueueUrl client queue-name))]
     (log/infof "Using SQS queue %s at %s" queue-name queue-url)
     {:client client
@@ -195,7 +195,7 @@
 (defn- send-message
   "Sends a new message with the given string body to the queue specified
   by the string URL.  Returns a map with :id and :body-md5 slots."
-  [^AmazonSQSClient client queue-url message opts]
+  [^AmazonSQS client queue-url message opts]
   (let [{:keys [message-attributes message-group-id message-deduplication-id]} opts
         message-attribute-value-map (build-msg-attributes message-attributes)
         send-message-request (cond-> (SendMessageRequest. queue-url message)
@@ -252,7 +252,7 @@
 (defn- receive
   "Receives one or more messages from the queue specified by the given URL.
   Input:
-    client - AmazonSQSClient
+    client - AmazonSQS
     queue-url - url to the SQS resource
 
     Optional keyword arguments:
@@ -279,7 +279,7 @@
     :receipt-handle - the ID used to delete the message from the queue after
               it has been fully processed.
     :source-queue - the URL of the queue from which the message was received"
-  [^AmazonSQSClient client queue-url & {:keys [limit
+  [^AmazonSQS client queue-url & {:keys [limit
                                                visibility
                                                wait-time-seconds
                                                ^java.util.Collection attributes
@@ -340,7 +340,7 @@
   Input:
     connection - as created by mk-connection
     message - the message to ack"
-  [{:keys [^AmazonSQSClient client
+  [{:keys [^AmazonSQS client
            ^String queue-url]}
    {:keys [^String receipt-handle]}]
   (log/debugf "Acking message %s" receipt-handle)
@@ -356,7 +356,7 @@
                                          Defaults to 0."
   ([connection message]
    (nack connection message 0))
-  ([{:keys [^AmazonSQSClient client
+  ([{:keys [^AmazonSQS client
             ^String queue-url]}
     {:keys [^String receipt-handle]}
     nack-visibility-seconds]
