@@ -17,6 +17,7 @@
   (:import
     (com.amazonaws.services.sqs.model
       CreateQueueRequest
+      GetQueueUrlRequest
       Message
       MessageAttributeValue
       QueueDoesNotExistException
@@ -168,11 +169,13 @@
 
   Will throw QueueDoesNotExistException if the queue does not exist.
   `configure-queue` can be used to create and configure the queue."
-  [^String queue-name & {:keys [client] :as options}]
+  [^String queue-name & {:keys [client account-id] :as options}]
   (dead-letter-deprecation-warning options)
   (validate-queue-name! queue-name)
   (let [^AmazonSQS client (or client (default-client))
-        queue-url (.getQueueUrl (.getQueueUrl client queue-name))]
+        get-queue-url-request (doto (GetQueueUrlRequest. queue-name)
+                                (.setQueueOwnerAWSAccountId account-id))
+        queue-url (.getQueueUrl (.getQueueUrl client get-queue-url-request))]
     (log/infof "Using SQS queue %s at %s" queue-name queue-url)
     {:client client
      :queue-name queue-name
