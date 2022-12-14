@@ -14,7 +14,7 @@
   "Functions for using Amazon Simple Queueing Service to request and perform
   computation."
   (:require
-    [clojure.core.async :refer [close! go-loop go thread >! <! <!! chan buffer onto-chan timeout]]
+    [clojure.core.async :refer [close! go-loop go thread >! <! <!! chan buffer onto-chan! timeout]]
     [clojure.core.async.impl.protocols :refer [closed?]]
     [clojure.tools.logging :as log]
     [com.climate.squeedo.sqs :as sqs]))
@@ -35,7 +35,7 @@
         (try
           (let [messages (sqs/dequeue* connection :limit dequeue-limit)]
             ; park until all messages are put onto message-channel
-            (<! (onto-chan message-chan messages false)))
+            (<! (onto-chan! message-chan messages false)))
           (catch Throwable t
             (log/errorf t "Encountered exception dequeueing.  Waiting %d ms before trying again." exceptional-poll-delay-ms)
             (<! (timeout exceptional-poll-delay-ms))))
@@ -57,7 +57,7 @@
           (try
             (let [messages (sqs/dequeue* connection :limit dequeue-limit)]
               ; block until all messages are put onto message-channel
-              (<!! (onto-chan message-chan messages false)))
+              (<!! (onto-chan! message-chan messages false)))
             (catch Throwable t
               (log/errorf t "Encountered exception dequeueing.  Waiting %d ms before trying again." exceptional-poll-delay-ms)
               (Thread/sleep exceptional-poll-delay-ms)))

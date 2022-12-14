@@ -17,11 +17,11 @@
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [org.clojure/tools.logging "0.4.0"]
-                 [org.clojure/core.async "0.4.474"]
-                 [cheshire "5.8.0"]
-                 [com.amazonaws/aws-java-sdk-sqs "1.11.306"]]
+  :dependencies [[org.clojure/clojure "1.11.1"]
+                 [org.clojure/tools.logging "1.2.4"]
+                 [org.clojure/core.async "1.6.673"]
+                 [cheshire "5.11.0"]
+                 [com.amazonaws/aws-java-sdk-sqs "1.12.351"]]
 
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :dependencies [[http-kit "2.2.0"]
