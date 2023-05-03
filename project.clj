@@ -17,19 +17,19 @@
   :license {:name "Apache License Version 2.0"
             :url "http://www.apache.org/licenses/LICENSE-2.0"
             :distribution :repo}
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [org.clojure/tools.logging "0.4.0"]
-                 [org.clojure/core.async "0.4.474"]
-                 [cheshire "5.8.0"]
-                 [com.amazonaws/aws-java-sdk-sqs "1.11.306"]]
+  :dependencies [[org.clojure/clojure "1.10.3" :scope "provided"]
+                 [org.clojure/tools.logging "1.2.4"]
+                 [org.clojure/core.async "1.5.648"]
+                 [cheshire "5.10.1"]
+                 [com.amazonaws/aws-java-sdk-sqs "1.12.137"]]
 
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
-                   :dependencies [[http-kit "2.2.0"]
+                   :dependencies [[http-kit "2.5.3"]
                                   [com.cemerick/bandalore "0.0.6"
                                    :exclusions [com.amazonaws/aws-java-sdk]]
                                   [com.climate/claypoole "1.1.4"]]}}
 
-  :plugins [[lein-ancient "0.6.15"]]
+  :plugins [[lein-ancient "0.7.0"]]
 
   :deploy-repositories [["releases" :clojars]]
 
