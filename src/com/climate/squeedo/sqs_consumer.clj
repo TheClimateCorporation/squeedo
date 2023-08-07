@@ -190,6 +190,7 @@
     :max-concurrent-work       - the maximum number of total messages processed.  This is mainly for async workflows;
                                  default num-workers
     :client                    - the SQS client to use (if missing, sqs/mk-connection will create a client)
+    :account-id                - the AWS account ID for cross-account connections
     :exceptional-poll-delay-ms - when an Exception is received while polling, the number of ms we wait until polling
                                  again.  Default is 10000 (10 seconds).
    Output:
@@ -198,7 +199,7 @@
   [queue-name compute & opts]
   (let [options (->options-map opts)
         _ (dead-letter-deprecation-warning options)
-        connection (sqs/mk-connection queue-name :client (:client options))
+        connection (sqs/mk-connection queue-name :client (:client options) (:account-id options))
         worker-count (get-worker-count options)
         listener-count (get-listener-count worker-count options)
         message-chan-size (get-message-channel-size listener-count options)
